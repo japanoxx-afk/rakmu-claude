@@ -48,6 +48,9 @@ $bytes = [IO.File]::ReadAllBytes($ExePath)
 # falls into this default branch, prints a debug string, and returns without
 # starting the remote client's countdown. Replace the default debug branch with
 # the same local countdown state used by classRoomNetMGR::RMPKRecv_GameStart.
+# RMPKRecv_GameStart also copies a start seed into 0x006E0970. The TNet packet
+# does not carry that room-net field, so initialize it to 0 instead of leaving a
+# stale value behind.
 $va = [uint32]0x0044D2E2
 $offset = Convert-VaToFileOffset $bytes $va
 $expected = [byte[]]@(
@@ -57,13 +60,23 @@ $expected = [byte[]]@(
     0x83,0xC4,0x08,
     0x5F,0x5E,0x5B,0x8B,0xE5,0x5D,0xC3
 )
-$patch = [byte[]]@(
+$oldPatch = [byte[]]@(
     # mov byte ptr [0x006DFC74], 5
     0xC6,0x05,0x74,0xFC,0x6D,0x00,0x05,
     # pop edi; pop esi; pop ebx; mov esp, ebp; pop ebp; ret
     0x5F,0x5E,0x5B,0x8B,0xE5,0x5D,0xC3,
     # pad remaining replaced debug-call bytes
     0x90,0x90,0x90,0x90,0x90,0x90,0x90,0x90,0x90
+)
+$patch = [byte[]]@(
+    # mov byte ptr [0x006DFC74], 5
+    0xC6,0x05,0x74,0xFC,0x6D,0x00,0x05,
+    # xor eax, eax; mov [0x006E0970], eax
+    0x33,0xC0,0xA3,0x70,0x09,0x6E,0x00,
+    # pop edi; pop esi; pop ebx; mov esp, ebp; pop ebp; ret
+    0x5F,0x5E,0x5B,0x8B,0xE5,0x5D,0xC3,
+    # pad remaining replaced debug-call bytes
+    0x90,0x90
 )
 
 $current = New-Object byte[] $expected.Length
@@ -74,7 +87,7 @@ if (Test-BytesEqual $current $patch) {
     return
 }
 
-if (-not (Test-BytesEqual $current $expected)) {
+if (-not (Test-BytesEqual $current $expected) -and -not (Test-BytesEqual $current $oldPatch)) {
     $hex = ($current | ForEach-Object { "{0:X2}" -f $_ }) -join " "
     throw "Unexpected bytes at VA 0x$('{0:X8}' -f $va), file offset 0x$('{0:X}' -f $offset): $hex"
 }

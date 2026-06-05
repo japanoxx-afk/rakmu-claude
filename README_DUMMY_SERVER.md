@@ -369,6 +369,7 @@ local countdown/game-start state used by `classRoomNetMGR::RMPKRecv_GameStart`:
 
 ```text
 byte [0x006DFC74] = 5
+DWORD [0x006E0970] = 0
 ```
 
 Apply this patch to every PC that will join multiplayer games:
@@ -376,3 +377,9 @@ Apply this patch to every PC that will join multiplayer games:
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File .\Patch-RhakMuBattleStartSync.ps1
 ```
+
+The dummy server also relays unhandled raw UDP datagrams between peers seen on
+the same UDP port. This is enabled by default with `-EnableUdpRelay $true`.
+Room/game synchronization often appears on UDP port `7000` as raw one-byte
+datagrams, so relaying them helps when direct peer-to-peer room traffic is not
+passing between clients.

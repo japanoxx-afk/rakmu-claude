@@ -31,6 +31,7 @@ param(
     [string]$ChannelUserListReplyMode = "empty",
     [int[]]$SkipUdpPorts = @(11223),
     [string]$TranscriptPath = ".\rhakmu_dummy_server_terminal.log",
+    [bool]$EnableUdpRelay = $true,
     [switch]$AcceptLikelyAccountPackets
 )
 
@@ -836,6 +837,44 @@ function Send-GameStartSync(
     Send-RoomBroadcast $Sender $Packet "game-start-original"
 }
 
+function Add-UdpPeer([int]$Port, [Net.IPEndPoint]$Remote) {
+    $key = "$Port|$($Remote.ToString())"
+    if ($script:UdpPeerKeys.Contains($key)) { return }
+
+    [void]$script:UdpPeerKeys.Add($key)
+    $script:UdpPeers.Add([pscustomobject]@{
+        Port = $Port
+        EndPoint = [Net.IPEndPoint]::new($Remote.Address, $Remote.Port)
+    })
+
+    $now = Get-NowStamp
+    Write-Host "[$now] UDP relay peer registered port=$Port peer=$($Remote.ToString())" -ForegroundColor Green
+}
+
+function Send-UdpRawRelay(
+    [object]$Entry,
+    [Net.IPEndPoint]$Remote,
+    [byte[]]$Data
+) {
+    if (-not $script:EnableUdpRelay) { return }
+    if ($Data.Length -le 0) { return }
+
+    Add-UdpPeer $Entry.Port $Remote
+
+    foreach ($peer in $script:UdpPeers.ToArray()) {
+        if ($peer.Port -ne $Entry.Port) { continue }
+        if ($peer.EndPoint.ToString() -eq $Remote.ToString()) { continue }
+
+        try {
+            [void]$Entry.Client.Send($Data, $Data.Length, $peer.EndPoint)
+            Save-PacketLog "udp-relay" $Entry.Port $peer.EndPoint.ToString() $Data
+        } catch {
+            $now = Get-NowStamp
+            Write-Host "[$now] UDP relay failed port=$($Entry.Port) peer=$($peer.EndPoint.ToString()) - $($_.Exception.Message)" -ForegroundColor Yellow
+        }
+    }
+}
+
 function Close-All {
     foreach ($c in $script:Clients.ToArray()) {
         try { $c.Stream.Close() } catch {}
@@ -869,6 +908,8 @@ $ip = [Net.IPAddress]::Parse($Bind)
 
 $script:TcpListeners = New-Object System.Collections.Generic.List[object]
 $script:UdpClients = New-Object System.Collections.Generic.List[object]
+$script:UdpPeers = New-Object System.Collections.Generic.List[object]
+$script:UdpPeerKeys = New-Object 'System.Collections.Generic.HashSet[string]'
 $script:Clients = New-Object System.Collections.Generic.List[object]
 $script:Rooms = New-Object System.Collections.Generic.List[object]
 $script:NextRoomId = 1
@@ -903,6 +944,7 @@ if ($RoomJoinHost -eq "127.0.0.1" -or $RoomJoinHost -eq "localhost") {
     $script:RoomJoinHost = $RoomJoinHost
 }
 $script:ChannelUserListReplyMode = $ChannelUserListReplyMode
+$script:EnableUdpRelay = $EnableUdpRelay
 $script:AcceptLikelyAccountPackets = [bool]$AcceptLikelyAccountPackets
 
 Write-Host "RhakMu dummy server" -ForegroundColor Green
@@ -926,6 +968,7 @@ Write-Host "RoomMakeResult: $RoomMakeResult"
 Write-Host "SendRoomJoinAfterMake: $([bool]$SendRoomJoinAfterMake)"
 Write-Host "RoomJoinHost: $script:RoomJoinHost"
 Write-Host "SkipUdpPorts: $($SkipUdpPorts -join ',')"
+Write-Host "EnableUdpRelay: $([bool]$EnableUdpRelay)"
 Write-Host "ChannelUserListReplyMode: $ChannelUserListReplyMode"
 Write-Host "AcceptLikelyAccountPackets: $([bool]$AcceptLikelyAccountPackets)"
 Write-Host "LogDir: $script:ResolvedLogDir"
@@ -1093,6 +1136,8 @@ try {
                 while ($entry.Client.Available -gt 0) {
                     $remote = [Net.IPEndPoint]::new([Net.IPAddress]::Any, 0)
                     $data = $entry.Client.Receive([ref]$remote)
+                    Add-UdpPeer $entry.Port $remote
+                    $sentUdpReply = $false
                     $packets = Split-TgPackets $data
                     foreach ($packet in $packets) {
                         Save-PacketLog "udp" $entry.Port $remote.ToString() $packet
@@ -1106,6 +1151,7 @@ try {
 
                             foreach ($reply in $replySet) {
                                 [void]$entry.Client.Send($reply, $reply.Length, $remote)
+                                $sentUdpReply = $true
                                 Save-PacketLog "udp-reply" $entry.Port $remote.ToString() $reply
                                 $rtype = Read-U16LE $reply 0
                                 $rsize = Read-U16LE $reply 2
@@ -1115,6 +1161,9 @@ try {
                                 Write-Host "[$now] UDP reply port=$($entry.Port) peer=$remoteText type=$rtypeText size=$rsize" -ForegroundColor Magenta
                             }
                         }
+                    }
+                    if (-not $sentUdpReply) {
+                        Send-UdpRawRelay $entry $remote $data
                     }
                 }
             } catch {
