@@ -394,15 +394,21 @@ Room/game synchronization often appears on UDP port `7000` as raw one-byte
 datagrams, so relaying them helps when direct peer-to-peer room traffic is not
 passing between clients.
 
-The server now also has `-GameStartSyncMode`, defaulting to
-`original-plus-variants`. When the host sends:
+The server also has `-GameStartSyncMode`, defaulting to `none`. In the
+2026-06-04 23:55 working-ish two-PC trace, both clients reached the game without
+the dummy server broadcasting `0x0FFF`; the start appears to have traveled over
+the clients' direct room/game path instead. Because later server-side `0x0FFF`
+variants did not start the guest and could destabilize the host, the dummy
+server no longer relays start packets by default.
+
+When experimenting, `-GameStartSyncMode original-plus-variants` makes the host
+packet:
 
 ```text
 FF 0F 07 00 02 00 00
 ```
 
-the server relays the original packet and then several narrow status/action
-variants:
+relay as the original packet plus several narrow status/action variants:
 
 ```text
 FF 0F 07 00 02 01 00
@@ -412,8 +418,8 @@ FF 0F 07 00 00 01 00
 ```
 
 This tests the stock `TNPacket_ReplyBattleReqReply` branches that key off the
-small action/status fields without requiring another client binary change. The
-server log should show:
+small action/status fields without requiring another client binary change. Use
+it only for controlled diagnosis. The server log then shows:
 
 ```text
 reason=game-start-original
@@ -421,6 +427,12 @@ reason=game-start-accept-variant
 reason=game-start-action1-status0
 reason=game-start-action1-status1
 reason=game-start-action0-status1
+```
+
+With the default `none` mode, the log shows:
+
+```text
+Game start relay suppressed
 ```
 
 ## Room Member Tracking

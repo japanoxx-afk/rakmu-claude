@@ -32,8 +32,8 @@ param(
     [int[]]$SkipUdpPorts = @(11223),
     [string]$TranscriptPath = ".\rhakmu_dummy_server_terminal.log",
     [bool]$EnableUdpRelay = $true,
-    [ValidateSet("original", "original-plus-accept", "accept-only", "original-plus-variants")]
-    [string]$GameStartSyncMode = "original-plus-variants",
+    [ValidateSet("none", "original", "original-plus-accept", "accept-only", "original-plus-variants")]
+    [string]$GameStartSyncMode = "none",
     [switch]$AcceptLikelyAccountPackets
 )
 
@@ -890,6 +890,12 @@ function Send-GameStartSync(
     [object]$Sender,
     [byte[]]$Packet
 ) {
+    if ($script:GameStartSyncMode -eq "none") {
+        $now = Get-NowStamp
+        Write-Host "[$now] Game start relay suppressed room=$($Sender.RoomTitle) from=$($Sender.Account)" -ForegroundColor DarkYellow
+        return
+    }
+
     if ($script:GameStartSyncMode -eq "original" -or $script:GameStartSyncMode -eq "original-plus-accept" -or $script:GameStartSyncMode -eq "original-plus-variants") {
         Send-RoomBroadcast $Sender $Packet "game-start-original"
     }
