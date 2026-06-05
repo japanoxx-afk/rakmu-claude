@@ -1,7 +1,9 @@
 param(
     [string]$GameDir = "C:\Program Files (x86)\TriggerSoft\RhakMu",
     [switch]$SkipFirewall,
-    [switch]$SkipGitPull
+    [switch]$SkipGitPull,
+    [switch]$SkipNetworkPreference,
+    [switch]$DisableVirtualAdapters
 )
 
 $ErrorActionPreference = "Stop"
@@ -54,6 +56,16 @@ if (-not $SkipFirewall) {
     }
 }
 
+if (-not $SkipNetworkPreference) {
+    Invoke-Step "Radmin VPN network preference" {
+        $networkArgs = @()
+        if ($DisableVirtualAdapters) {
+            $networkArgs += "-DisableVirtualAdapters"
+        }
+        & (Join-Path $root "Set-RhakMuNetworkPreference.ps1") @networkArgs
+    }
+}
+
 Invoke-Step "Battle start sync client patch" {
     & (Join-Path $root "Patch-RhakMuBattleStartSync.ps1") -ExePath (Join-Path $GameDir "Rhakmu.exe")
 }
@@ -76,3 +88,4 @@ Invoke-Step "Final patch verification" {
 
 Write-Host ""
 Write-Host "RhakMu client setup completed. Run this same script on every PC before testing multiplayer." -ForegroundColor Green
+Write-Host "If room members are still removed after 10-20 seconds, rerun with -DisableVirtualAdapters on both PCs." -ForegroundColor Yellow

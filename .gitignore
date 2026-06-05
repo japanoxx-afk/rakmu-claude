@@ -1,4 +1,5 @@
 rhakmu_packet_logs/
+rhakmu_packet_captures/
 analysis/
 third_party/
 *.log

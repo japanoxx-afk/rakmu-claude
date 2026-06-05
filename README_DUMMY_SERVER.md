@@ -29,6 +29,32 @@ client-to-client UDP. Run `Install-RhakMuClientPatches.ps1` as administrator on
 both PCs after pulling the latest files so the strengthened inbound/outbound
 RhakMu firewall rules are installed.
 
+The 2026-06-06 UDP capture showed a more specific failure mode: the clients
+initially exchanged UDP on the Radmin VPN addresses, then the server-side
+client started sending repeated UDP keepalives from `192.168.0.22` to
+`192.168.56.1`. That `192.168.56.1` address is a virtual/host-only adapter on
+the other PC, not the Radmin peer address, so the room peer check times out
+after roughly 10-20 seconds.
+
+Run this on both PCs before multiplayer tests:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\Install-RhakMuClientPatches.ps1
+```
+
+If the same timeout continues, temporarily disable VMware/VirtualBox/Hyper-V
+host-only adapters for the RhakMu test:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\Install-RhakMuClientPatches.ps1 -DisableVirtualAdapters
+```
+
+After testing, restore disabled virtual adapters:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\Set-RhakMuNetworkPreference.ps1 -RestoreVirtualAdapters
+```
+
 If members are still removed after 10-20 seconds, capture UDP `11223` on both
 PCs:
 
@@ -315,13 +341,15 @@ Run this on every PC. If a PC can connect to the lobby but cannot receive countd
 
 Room presence/timeout notes:
 
-- The server now listens on UDP `11223` by default as well as TCP `11223`.
-- Earlier builds skipped UDP `11223`, so room presence or peer-check datagrams
-  sent to the server address could disappear without being logged or relayed.
-- `0x1FFF` channel-user-list requests still return an empty start/end list by
-  default. A brief member-list experiment made the client show the host IP as
-  user text and could block room entry, so it is now gated behind the explicit
-  `-ChannelUserListReplyMode members` option for future protocol work only.
+- The server skips UDP `11223` by default. When the server PC also runs a
+  RhakMu client, that client must own UDP `11223` for direct room peer checks.
+- `0x1FFF` channel-user-list requests return the current lobby/member list by
+  default. Room-specific member-list broadcasts are also sent when a user joins
+  a room, but they do not replace the client's direct UDP peer check.
+- If a room member disappears after 10-20 seconds, inspect UDP capture output
+  first. Any repeated traffic to `192.168.*`, `172.16.*`, `10.*`, VMware,
+  VirtualBox, Hyper-V, or host-only adapter addresses means the client picked
+  the wrong network interface for peer checks.
 
 ## Client Patch Verification
 
