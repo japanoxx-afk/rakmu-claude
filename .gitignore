@@ -1,0 +1,11 @@
+rhakmu_packet_logs/
+analysis/
+third_party/
+*.log
+*.ERR
+*.bak*
+*.tmp
+*.dmp
+*.zip
+*.7z
+*.rar
