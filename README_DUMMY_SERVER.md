@@ -395,26 +395,32 @@ datagrams, so relaying them helps when direct peer-to-peer room traffic is not
 passing between clients.
 
 The server now also has `-GameStartSyncMode`, defaulting to
-`original-plus-accept`. When the host sends:
+`original-plus-variants`. When the host sends:
 
 ```text
 FF 0F 07 00 02 00 00
 ```
 
-the server relays the original packet and then a conservative accept-status
-variant:
+the server relays the original packet and then several narrow status/action
+variants:
 
 ```text
 FF 0F 07 00 02 01 00
+FF 0F 07 00 01 00 00
+FF 0F 07 00 01 01 00
+FF 0F 07 00 00 01 00
 ```
 
-This tests the stock `TNPacket_ReplyBattleReqReply` branch that keys off
-`packet[5] - 1` without requiring another client binary change. The server log
-should show both:
+This tests the stock `TNPacket_ReplyBattleReqReply` branches that key off the
+small action/status fields without requiring another client binary change. The
+server log should show:
 
 ```text
 reason=game-start-original
 reason=game-start-accept-variant
+reason=game-start-action1-status0
+reason=game-start-action1-status1
+reason=game-start-action0-status1
 ```
 
 ## Room Member Tracking

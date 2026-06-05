@@ -32,8 +32,8 @@ param(
     [int[]]$SkipUdpPorts = @(11223),
     [string]$TranscriptPath = ".\rhakmu_dummy_server_terminal.log",
     [bool]$EnableUdpRelay = $true,
-    [ValidateSet("original", "original-plus-accept", "accept-only")]
-    [string]$GameStartSyncMode = "original-plus-accept",
+    [ValidateSet("original", "original-plus-accept", "accept-only", "original-plus-variants")]
+    [string]$GameStartSyncMode = "original-plus-variants",
     [switch]$AcceptLikelyAccountPackets
 )
 
@@ -890,15 +890,31 @@ function Send-GameStartSync(
     [object]$Sender,
     [byte[]]$Packet
 ) {
-    if ($script:GameStartSyncMode -eq "original" -or $script:GameStartSyncMode -eq "original-plus-accept") {
+    if ($script:GameStartSyncMode -eq "original" -or $script:GameStartSyncMode -eq "original-plus-accept" -or $script:GameStartSyncMode -eq "original-plus-variants") {
         Send-RoomBroadcast $Sender $Packet "game-start-original"
     }
 
-    if (($script:GameStartSyncMode -eq "accept-only" -or $script:GameStartSyncMode -eq "original-plus-accept") -and $Packet.Length -ge 7) {
+    if (($script:GameStartSyncMode -eq "accept-only" -or $script:GameStartSyncMode -eq "original-plus-accept" -or $script:GameStartSyncMode -eq "original-plus-variants") -and $Packet.Length -ge 7) {
         $acceptPacket = New-Object byte[] $Packet.Length
         [Array]::Copy($Packet, 0, $acceptPacket, 0, $Packet.Length)
         $acceptPacket[5] = 1
         Send-RoomBroadcast $Sender $acceptPacket "game-start-accept-variant"
+    }
+
+    if ($script:GameStartSyncMode -eq "original-plus-variants" -and $Packet.Length -ge 7) {
+        $variants = @(
+            @{ A = [byte]1; B = [byte]0; Name = "game-start-action1-status0" },
+            @{ A = [byte]1; B = [byte]1; Name = "game-start-action1-status1" },
+            @{ A = [byte]0; B = [byte]1; Name = "game-start-action0-status1" }
+        )
+
+        foreach ($variant in $variants) {
+            $variantPacket = New-Object byte[] $Packet.Length
+            [Array]::Copy($Packet, 0, $variantPacket, 0, $Packet.Length)
+            $variantPacket[4] = $variant.A
+            $variantPacket[5] = $variant.B
+            Send-RoomBroadcast $Sender $variantPacket $variant.Name
+        }
     }
 }
 
