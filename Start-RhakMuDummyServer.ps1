@@ -32,6 +32,8 @@ param(
     [int[]]$SkipUdpPorts = @(11223),
     [string]$TranscriptPath = ".\rhakmu_dummy_server_terminal.log",
     [bool]$EnableUdpRelay = $true,
+    [ValidateSet("original", "original-plus-accept", "accept-only")]
+    [string]$GameStartSyncMode = "original-plus-accept",
     [switch]$AcceptLikelyAccountPackets
 )
 
@@ -888,7 +890,16 @@ function Send-GameStartSync(
     [object]$Sender,
     [byte[]]$Packet
 ) {
-    Send-RoomBroadcast $Sender $Packet "game-start-original"
+    if ($script:GameStartSyncMode -eq "original" -or $script:GameStartSyncMode -eq "original-plus-accept") {
+        Send-RoomBroadcast $Sender $Packet "game-start-original"
+    }
+
+    if (($script:GameStartSyncMode -eq "accept-only" -or $script:GameStartSyncMode -eq "original-plus-accept") -and $Packet.Length -ge 7) {
+        $acceptPacket = New-Object byte[] $Packet.Length
+        [Array]::Copy($Packet, 0, $acceptPacket, 0, $Packet.Length)
+        $acceptPacket[5] = 1
+        Send-RoomBroadcast $Sender $acceptPacket "game-start-accept-variant"
+    }
 }
 
 function Add-UdpPeer([int]$Port, [Net.IPEndPoint]$Remote) {
@@ -999,6 +1010,7 @@ if ($RoomJoinHost -eq "127.0.0.1" -or $RoomJoinHost -eq "localhost") {
 }
 $script:ChannelUserListReplyMode = $ChannelUserListReplyMode
 $script:EnableUdpRelay = $EnableUdpRelay
+$script:GameStartSyncMode = $GameStartSyncMode
 $script:AcceptLikelyAccountPackets = [bool]$AcceptLikelyAccountPackets
 
 Write-Host "RhakMu dummy server" -ForegroundColor Green
@@ -1023,6 +1035,7 @@ Write-Host "SendRoomJoinAfterMake: $([bool]$SendRoomJoinAfterMake)"
 Write-Host "RoomJoinHost: $script:RoomJoinHost"
 Write-Host "SkipUdpPorts: $($SkipUdpPorts -join ',')"
 Write-Host "EnableUdpRelay: $([bool]$EnableUdpRelay)"
+Write-Host "GameStartSyncMode: $GameStartSyncMode"
 Write-Host "ChannelUserListReplyMode: $ChannelUserListReplyMode"
 Write-Host "AcceptLikelyAccountPackets: $([bool]$AcceptLikelyAccountPackets)"
 Write-Host "LogDir: $script:ResolvedLogDir"

@@ -384,6 +384,29 @@ Room/game synchronization often appears on UDP port `7000` as raw one-byte
 datagrams, so relaying them helps when direct peer-to-peer room traffic is not
 passing between clients.
 
+The server now also has `-GameStartSyncMode`, defaulting to
+`original-plus-accept`. When the host sends:
+
+```text
+FF 0F 07 00 02 00 00
+```
+
+the server relays the original packet and then a conservative accept-status
+variant:
+
+```text
+FF 0F 07 00 02 01 00
+```
+
+This tests the stock `TNPacket_ReplyBattleReqReply` branch that keys off
+`packet[5] - 1` without requiring another client binary change. The server log
+should show both:
+
+```text
+reason=game-start-original
+reason=game-start-accept-variant
+```
+
 ## Room Member Tracking
 
 Observed in the two-PC start-sync failure:
