@@ -24,6 +24,11 @@ By default the dummy server skips UDP `11223`. When the server PC also runs a
 RhakMu client, that client needs UDP `11223` for room peer checks, so the dummy
 server must not bind it.
 
+Room members can still be removed after 10-20 seconds if Windows blocks direct
+client-to-client UDP. Run `Install-RhakMuClientPatches.ps1` as administrator on
+both PCs after pulling the latest files so the strengthened inbound/outbound
+RhakMu firewall rules are installed.
+
 ## Room Join Network Watch
 
 When two PCs can see a room but cannot enter it, run this on both PCs before
