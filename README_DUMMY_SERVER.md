@@ -20,6 +20,10 @@ Log files are written to:
 .\rhakmu_packet_logs
 ```
 
+By default the dummy server skips UDP `11223`. When the server PC also runs a
+RhakMu client, that client needs UDP `11223` for room peer checks, so the dummy
+server must not bind it.
+
 ## Room Join Network Watch
 
 When two PCs can see a room but cannot enter it, run this on both PCs before

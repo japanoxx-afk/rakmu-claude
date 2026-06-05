@@ -28,8 +28,8 @@ param(
     [switch]$SendRoomJoinAfterMake,
     [string]$RoomJoinHost = "127.0.0.1",
     [ValidateSet("ignore", "empty", "members")]
-    [string]$ChannelUserListReplyMode = "empty",
-    [int[]]$SkipUdpPorts = @(),
+    [string]$ChannelUserListReplyMode = "members",
+    [int[]]$SkipUdpPorts = @(11223),
     [string]$TranscriptPath = ".\rhakmu_dummy_server_terminal.log",
     [bool]$EnableUdpRelay = $true,
     [ValidateSet("none", "original", "original-plus-accept", "accept-only", "original-plus-variants")]

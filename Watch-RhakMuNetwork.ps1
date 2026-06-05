@@ -1,6 +1,7 @@
 param(
     [int]$DurationSeconds = 120,
     [int]$IntervalMs = 500,
+    [int[]]$Ports = @(80, 2000, 2300, 2301, 2302, 2303, 2304, 2400, 3000, 4000, 5000, 7000, 7777, 8000, 8080, 9000, 10000, 10001, 10262, 11000, 11223, 12000, 20000, 21000, 28000, 47624),
     [string]$OutputPath = ""
 )
 
@@ -30,6 +31,7 @@ Write-WatchLine "Started: $(Get-NowStamp)"
 Write-WatchLine "Computer: $env:COMPUTERNAME"
 Write-WatchLine "DurationSeconds: $DurationSeconds"
 Write-WatchLine "IntervalMs: $IntervalMs"
+Write-WatchLine "Ports: $($Ports -join ',')"
 Write-WatchLine "OutputPath: $fullPath"
 Write-WatchLine ""
 
@@ -46,8 +48,22 @@ $stopAt = (Get-Date).AddSeconds($DurationSeconds)
 $lastSnapshot = ""
 
 while ((Get-Date) -lt $stopAt) {
+    $allUdpRows = @(Get-NetUDPEndpoint | Where-Object { $Ports -contains $_.LocalPort })
+    $allTcpRows = @(Get-NetTCPConnection | Where-Object {
+        ($Ports -contains $_.LocalPort) -or ($Ports -contains $_.RemotePort)
+    })
+
+    $processIds = New-Object System.Collections.Generic.HashSet[int]
+    foreach ($row in $allUdpRows) { [void]$processIds.Add([int]$row.OwningProcess) }
+    foreach ($row in $allTcpRows) { [void]$processIds.Add([int]$row.OwningProcess) }
+
+    $nameMatchedProcs = @(Get-Process | Where-Object {
+        $_.ProcessName -match "Rhak|Rak|Icarus|Launcher|python|powershell"
+    })
+    foreach ($p in $nameMatchedProcs) { [void]$processIds.Add([int]$p.Id) }
+
     $procs = @(Get-Process | Where-Object {
-        $_.ProcessName -match "Rhak|Launcher|python|powershell"
+        $processIds.Contains([int]$_.Id)
     } | Sort-Object ProcessName,Id)
 
     $ids = @($procs | ForEach-Object { $_.Id })
@@ -55,9 +71,13 @@ while ((Get-Date) -lt $stopAt) {
     $tcpRows = @()
 
     if ($ids.Count -gt 0) {
-        $udpRows = @(Get-NetUDPEndpoint | Where-Object { $ids -contains $_.OwningProcess } |
+        $udpRows = @(Get-NetUDPEndpoint | Where-Object {
+                ($ids -contains $_.OwningProcess) -and ($Ports -contains $_.LocalPort)
+            } |
             Sort-Object OwningProcess,LocalAddress,LocalPort)
-        $tcpRows = @(Get-NetTCPConnection | Where-Object { $ids -contains $_.OwningProcess } |
+        $tcpRows = @(Get-NetTCPConnection | Where-Object {
+                ($ids -contains $_.OwningProcess) -and (($Ports -contains $_.LocalPort) -or ($Ports -contains $_.RemotePort))
+            } |
             Sort-Object OwningProcess,LocalAddress,LocalPort,RemoteAddress,RemotePort)
     }
 
