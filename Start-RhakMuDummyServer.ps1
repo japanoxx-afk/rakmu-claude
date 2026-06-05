@@ -297,8 +297,53 @@ function New-RoomFromCreatePacket([byte[]]$Packet) {
         Host = (Resolve-RoomHost $script:CurrentHost)
         MaxPlayers = (Get-RoomMaxPlayersFromCreatePayload $payload)
         ItemPayload = $payload
+        RoomMembers = (New-Object System.Collections.Generic.List[object])
         CreatedAt = Get-Date
     }
+}
+
+function Ensure-RoomMembers([object]$Room) {
+    if ($null -eq $Room) { return $null }
+    if ($null -eq $Room.PSObject.Properties["RoomMembers"]) {
+        $Room | Add-Member -NotePropertyName RoomMembers -NotePropertyValue (New-Object System.Collections.Generic.List[object])
+    }
+    Write-Output -NoEnumerate $Room.RoomMembers
+}
+
+function Add-RoomMember([object]$Room, [string]$Account, [string]$HostAddress) {
+    if ($null -eq $Room -or [string]::IsNullOrWhiteSpace($Account)) { return }
+    if ([string]::IsNullOrWhiteSpace($HostAddress)) { $HostAddress = $script:RoomJoinHost }
+
+    $members = Ensure-RoomMembers $Room
+    foreach ($member in @($members.ToArray())) {
+        if ($member.Account -eq $Account) {
+            [void]$members.Remove($member)
+        }
+    }
+
+    $members.Add([pscustomobject]@{
+        Account = $Account
+        Host = $HostAddress
+    })
+}
+
+function Remove-RoomMember([object]$Room, [string]$Account) {
+    if ($null -eq $Room -or [string]::IsNullOrWhiteSpace($Account)) { return }
+    $members = Ensure-RoomMembers $Room
+    foreach ($member in @($members.ToArray())) {
+        if ($member.Account -eq $Account) {
+            [void]$members.Remove($member)
+        }
+    }
+}
+
+function Get-RoomMemberCount([object]$Room) {
+    if ($null -eq $Room) { return 1 }
+    $members = Ensure-RoomMembers $Room
+    if ($null -ne $members -and $members.Count -gt 0) {
+        return [Math]::Max(1, [Math]::Min(8, [int]$members.Count))
+    }
+    return 1
 }
 
 function Get-RoomMaxPlayersFromCreatePayload([byte[]]$Payload) {
@@ -313,7 +358,7 @@ function New-ServerRoomListPayload([object]$Room) {
     $roomName = if ([string]::IsNullOrWhiteSpace($Room.Title)) { $Room.Owner } else { $Room.Title }
     $hostName = if ([string]::IsNullOrWhiteSpace($Room.Host)) { $script:RoomJoinHost } else { $Room.Host }
     $maxPlayers = [Math]::Max(1, [Math]::Min(8, [int]$Room.MaxPlayers))
-    $currentPlayers = 1
+    $currentPlayers = Get-RoomMemberCount $Room
 
     # TNPacket_ReplyRoomList reads one room as:
     #   10-byte server-room header,
@@ -371,6 +416,7 @@ function Register-RoomFromCreatePacket([byte[]]$Packet) {
     }
 
     $script:NextRoomId++
+    Add-RoomMember $room $room.Owner $room.Host
     $script:Rooms.Add($room)
     $now = Get-NowStamp
     Write-Host "[$now] Room registered id=$($room.Id) title=$($room.Title) map=$($room.Map) owner=$($room.Owner) host=$($room.Host)" -ForegroundColor Green
@@ -391,6 +437,14 @@ function Find-RoomForJoin([byte[]]$Packet) {
         }
     }
     return $last
+}
+
+function Find-RoomByTitle([string]$Title) {
+    if ([string]::IsNullOrWhiteSpace($Title)) { return $null }
+    foreach ($room in $script:Rooms) {
+        if ($room.Title -eq $Title) { return $room }
+    }
+    return $null
 }
 
 function Test-PostGameRoomReentryPacket([byte[]]$Packet) {
@@ -830,6 +884,39 @@ function Send-RoomBroadcast(
     }
 }
 
+function Send-RoomJoinNotify(
+    [object]$Joiner,
+    [object]$Room
+) {
+    if ($null -eq $Joiner -or $null -eq $Room) { return }
+    if ([string]::IsNullOrWhiteSpace($Joiner.RoomTitle)) { return }
+
+    $joinAccount = $Joiner.Account
+    if ([string]::IsNullOrWhiteSpace($joinAccount)) { return }
+
+    $joinHost = Resolve-RoomHost (Get-PeerHost $Joiner.Peer)
+    $packet = New-TgPacket 0x10FF (New-RoomJoinPayload $joinAccount $joinHost)
+
+    $now = Get-NowStamp
+    Write-Host "[$now] Room join notify room=$($Room.Title) account=$joinAccount host=$joinHost" -ForegroundColor Green
+
+    foreach ($target in $script:Clients.ToArray()) {
+        if ($target.Port -ne $Joiner.Port) { continue }
+        if ($target.Peer -eq $Joiner.Peer) { continue }
+        if (-not $target.Client.Connected) { continue }
+        if ($target.RoomTitle -ne $Joiner.RoomTitle) { continue }
+        try {
+            Send-TcpPacket $target $packet "tcp-room-join-notify"
+        } catch {
+            $errNow = Get-NowStamp
+            Write-Host "[$errNow] Room join notify failed peer=$($target.Peer) - $($_.Exception.Message)" -ForegroundColor Yellow
+            try { $target.Stream.Close() } catch {}
+            try { $target.Client.Close() } catch {}
+            [void]$script:Clients.Remove($target)
+        }
+    }
+}
+
 function Send-GameStartSync(
     [object]$Sender,
     [byte[]]$Packet
@@ -1094,6 +1181,7 @@ try {
                                     $room = Find-RoomForJoin $packet
                                     if ($null -ne $room) {
                                         $conn.RoomTitle = $room.Title
+                                        Add-RoomMember $room $conn.Account (Resolve-RoomHost (Get-PeerHost $conn.Peer))
                                         $now = Get-NowStamp
                                         Write-Host "[$now] Client room joined peer=$($conn.Peer) account=$($conn.Account) room=$($conn.RoomTitle)" -ForegroundColor Green
                                     }
@@ -1102,6 +1190,13 @@ try {
 
                             foreach ($reply in $replySet) {
                                 Send-TcpPacket $conn $reply "tcp-reply"
+                            }
+
+                            if ($reqType -eq 0x10FF -and -not (Test-PostGameRoomReentryPacket $packet)) {
+                                $room = Find-RoomByTitle $conn.RoomTitle
+                                if ($null -ne $room) {
+                                    Send-RoomJoinNotify $conn $room
+                                }
                             }
 
                             if ($reqType -eq 0x12FF) {
@@ -1117,6 +1212,10 @@ try {
                             }
 
                             if ($reqType -eq 0x11FF) {
+                                $room = Find-RoomByTitle $conn.RoomTitle
+                                if ($null -ne $room) {
+                                    Remove-RoomMember $room $conn.Account
+                                }
                                 $conn.RoomTitle = ""
                             }
                         }

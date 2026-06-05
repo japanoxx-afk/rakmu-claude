@@ -383,3 +383,32 @@ the same UDP port. This is enabled by default with `-EnableUdpRelay $true`.
 Room/game synchronization often appears on UDP port `7000` as raw one-byte
 datagrams, so relaying them helps when direct peer-to-peer room traffic is not
 passing between clients.
+
+## Room Member Join Notification
+
+Observed in the two-PC start-sync failure:
+
+```text
+test1 -> server:  FF 10 ... "test2\0..."
+server -> test1:  FF 10 ... "test1\0<host-ip>\0"
+host starts:      FF 0F 07 00 02 00 00
+server -> test1:  FF 0F 07 00 02 00 00
+```
+
+The server was acknowledging the join only to the joining client. The host did
+not receive a room-member notification, so the host could continue to behave as
+if the room was a one-player room and start countdown alone.
+
+When a client joins an existing room, the server now:
+
+1. Tracks the room member in memory.
+2. Reports the updated current-player count in battlefield room-list items.
+3. Sends the existing room members a `0x10FF` room-join notification containing
+   the joining account and the joining peer host.
+
+During the next multiplayer test, confirm the server log contains:
+
+```text
+Room join notify room=<room> account=<joining account> host=<joining host>
+TCP-ROOM-JOIN-NOTIFY ... type=0x10FF
+```
