@@ -279,6 +279,16 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\Configure-RhakMuFirewall.p
 
 Run this on every PC. If a PC can connect to the lobby but cannot receive countdown/game packets when it hosts, Windows firewall or the selected host IP is the first thing to check.
 
+Room presence/timeout notes:
+
+- The server now listens on UDP `11223` by default as well as TCP `11223`.
+- Earlier builds skipped UDP `11223`, so room presence or peer-check datagrams
+  sent to the server address could disappear without being logged or relayed.
+- `0x1FFF` channel-user-list requests now return the tracked room members
+  when the client is inside a room, instead of always returning an empty list.
+  This is meant to help the room screen learn both account/IP entries before
+  its own peer timeout logic removes a participant.
+
 ## Client Patch Verification
 
 Run this on each PC after copying the latest scripts:

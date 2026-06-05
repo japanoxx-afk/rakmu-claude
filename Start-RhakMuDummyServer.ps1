@@ -29,7 +29,7 @@ param(
     [string]$RoomJoinHost = "127.0.0.1",
     [ValidateSet("ignore", "empty")]
     [string]$ChannelUserListReplyMode = "empty",
-    [int[]]$SkipUdpPorts = @(11223),
+    [int[]]$SkipUdpPorts = @(),
     [string]$TranscriptPath = ".\rhakmu_dummy_server_terminal.log",
     [bool]$EnableUdpRelay = $true,
     [ValidateSet("none", "original", "original-plus-accept", "accept-only", "original-plus-variants")]
@@ -393,6 +393,38 @@ function New-ServerRoomListPayload([object]$Room) {
     return Join-ByteArrays @($header, (New-NulStringBytes $roomName), $roomData)
 }
 
+function New-ServerChannelUserPayload([string]$Account, [string]$HostAddress) {
+    if ([string]::IsNullOrWhiteSpace($Account)) { $Account = $script:TestAccount }
+    if ([string]::IsNullOrWhiteSpace($HostAddress)) { $HostAddress = $script:RoomJoinHost }
+
+    # The exact t_server_channeluser_reply layout is still being recovered.
+    # The client-side helpers expose account and server IP strings, and this
+    # packet family uses TG_Net string packing elsewhere, so keep the payload
+    # conservative: account plus host, both NUL terminated.
+    return Join-ByteArrays @(
+        (New-NulStringBytes $Account),
+        (New-NulStringBytes $HostAddress)
+    )
+}
+
+function Add-ChannelUserListReplies(
+    [System.Collections.Generic.List[byte[]]]$Replies,
+    [object]$Room
+) {
+    $Replies.Add((New-TgPacket 0x20FF ([byte[]]@())))
+
+    $members = Ensure-RoomMembers $Room
+    if ($null -ne $members -and $members.Count -gt 0) {
+        foreach ($member in $members.ToArray()) {
+            $Replies.Add((New-TgPacket 0x1FFF (New-ServerChannelUserPayload $member.Account $member.Host)))
+        }
+    } elseif (-not [string]::IsNullOrWhiteSpace($script:CurrentAccount)) {
+        $Replies.Add((New-TgPacket 0x1FFF (New-ServerChannelUserPayload $script:CurrentAccount (Resolve-RoomHost $script:CurrentHost))))
+    }
+
+    $Replies.Add((New-TgPacket 0x21FF ([byte[]]@())))
+}
+
 function New-ServerMessagePayload([string]$Message, [string]$Account) {
     if ([string]::IsNullOrWhiteSpace($Account)) { $Account = "server" }
     if ($null -eq $Message) { $Message = "" }
@@ -636,12 +668,17 @@ function New-RhakMuProtocolReplies([byte[]]$Packet) {
         [void](Remove-RoomsForCurrentClient)
     }
 
-    # Observed after room creation. Client handlers show:
+    # Observed after room creation and room join. Client handlers show:
     # 0x20FF = ChannelUserListStart, 0x1FFF = ChannelUserListItem,
     # 0x21FF = ChannelUserListEnd.
     if ($reqType -eq 0x1FFF -and $script:ChannelUserListReplyMode -eq "empty") {
-        $replies.Add((New-TgPacket 0x20FF ([byte[]]@())))
-        $replies.Add((New-TgPacket 0x21FF ([byte[]]@())))
+        $room = Find-RoomByTitle $script:CurrentRoomTitle
+        if ($null -ne $room) {
+            Add-ChannelUserListReplies $replies $room
+        } else {
+            $replies.Add((New-TgPacket 0x20FF ([byte[]]@())))
+            $replies.Add((New-TgPacket 0x21FF ([byte[]]@())))
+        }
     }
 
     # Observed around battle/game cleanup. 0x24FF tolerates a compact 0x25FF
