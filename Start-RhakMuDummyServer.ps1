@@ -987,16 +987,32 @@ function Send-UdpRawRelay(
 
     Add-UdpPeer $Entry.Port $Remote
 
+    $sentCount = 0
     foreach ($peer in $script:UdpPeers.ToArray()) {
         if ($peer.Port -ne $Entry.Port) { continue }
         if ($peer.EndPoint.ToString() -eq $Remote.ToString()) { continue }
 
         try {
             [void]$Entry.Client.Send($Data, $Data.Length, $peer.EndPoint)
+            $sentCount++
             Save-PacketLog "udp-relay" $Entry.Port $peer.EndPoint.ToString() $Data
         } catch {
             $now = Get-NowStamp
             Write-Host "[$now] UDP relay failed port=$($Entry.Port) peer=$($peer.EndPoint.ToString()) - $($_.Exception.Message)" -ForegroundColor Yellow
+        }
+    }
+
+    if ($sentCount -eq 0) {
+        $warnKey = "$($Entry.Port)|$($Remote.ToString())"
+        if ($script:UdpNoTargetWarned.Add($warnKey)) {
+            $knownPeers = @(
+                $script:UdpPeers.ToArray() |
+                    Where-Object { $_.Port -eq $Entry.Port } |
+                    ForEach-Object { $_.EndPoint.ToString() }
+            )
+            $now = Get-NowStamp
+            $knownText = if ($knownPeers.Count -gt 0) { $knownPeers -join ", " } else { "(none)" }
+            Write-Host "[$now] UDP relay has no target port=$($Entry.Port) from=$($Remote.ToString()) known=$knownText" -ForegroundColor DarkYellow
         }
     }
 }
@@ -1036,6 +1052,7 @@ $script:TcpListeners = New-Object System.Collections.Generic.List[object]
 $script:UdpClients = New-Object System.Collections.Generic.List[object]
 $script:UdpPeers = New-Object System.Collections.Generic.List[object]
 $script:UdpPeerKeys = New-Object 'System.Collections.Generic.HashSet[string]'
+$script:UdpNoTargetWarned = New-Object 'System.Collections.Generic.HashSet[string]'
 $script:Clients = New-Object System.Collections.Generic.List[object]
 $script:Rooms = New-Object System.Collections.Generic.List[object]
 $script:NextRoomId = 1

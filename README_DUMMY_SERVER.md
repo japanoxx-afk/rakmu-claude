@@ -20,6 +20,20 @@ Log files are written to:
 .\rhakmu_packet_logs
 ```
 
+## Room Join Network Watch
+
+When two PCs can see a room but cannot enter it, run this on both PCs before
+the join test:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\Watch-RhakMuNetwork.ps1
+```
+
+Keep the watch running, create a room, try to enter it from the other PC, then
+send the generated `rhakmu_network_watch_*.log` files with the dummy server
+terminal log. The important lines are RhakMu UDP endpoints and whether both
+players are visible on UDP port `11223`.
+
 Each received packet creates:
 
 - `.bin`: raw packet bytes
