@@ -248,6 +248,11 @@ The 2026-06-05 21:24-21:26 test showed:
 
 That points to a direct connectivity/NAT/firewall difference between the two host directions, not to the dummy server's TCP start reply.
 
+Room join reply detail:
+
+- `0x10FF` success replies now send the room owner/host account plus the host IP.
+- Earlier builds sent the joining account in that field, which can let both clients enter the room but misalign the local player slot/race when the RTS match starts.
+
 ## Client Patch Verification
 
 Run this on each PC after copying the latest scripts:

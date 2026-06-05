@@ -625,9 +625,10 @@ function New-RhakMuProtocolReplies([byte[]]$Packet) {
             if ($null -eq $room) {
                 $replies.Add((New-TgPacket 0x10FF ([BitConverter]::GetBytes([uint32]1))))
             } else {
-                $joinAccount = $script:CurrentAccount
-                if ([string]::IsNullOrWhiteSpace($joinAccount)) { $joinAccount = $room.Owner }
-                $replies.Add((New-TgPacket 0x10FF (New-RoomJoinPayload $joinAccount $room.Host)))
+                # The first string in the room-join reply is treated as the room host
+                # identity by the client-side room/game setup. Sending the joining
+                # account here can flip the local player slot at game start.
+                $replies.Add((New-TgPacket 0x10FF (New-RoomJoinPayload $room.Owner $room.Host)))
             }
         }
     }
@@ -1185,7 +1186,7 @@ try {
                                         $conn.RoomTitle = $room.Title
                                         Add-RoomMember $room $conn.Account (Resolve-RoomHost (Get-PeerHost $conn.Peer))
                                         $now = Get-NowStamp
-                                        Write-Host "[$now] Client room joined peer=$($conn.Peer) account=$($conn.Account) room=$($conn.RoomTitle)" -ForegroundColor Green
+                                        Write-Host "[$now] Client room joined peer=$($conn.Peer) account=$($conn.Account) room=$($conn.RoomTitle) hostAccount=$($room.Owner) host=$($room.Host)" -ForegroundColor Green
                                     }
                                 }
                             }
