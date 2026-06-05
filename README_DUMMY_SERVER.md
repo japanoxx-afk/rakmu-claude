@@ -284,10 +284,21 @@ This mode replies to account-looking packets with several success candidates. On
 Current default:
 
 ```powershell
-.\Start-RhakMuDummyServer.ps1 -AutoReply none -GameStartSyncMode none
+.\Start-RhakMuDummyServer.ps1 -AutoReply none -GameStartSyncMode original
 ```
 
-`GameStartSyncMode none` is intentional. In the 2026-06-04 23:55 capture, both clients reached countdown/game without the dummy server relaying `0x0FFF`; the start signal was handled by the clients' direct room/game path. Server-side `0x0FFF` broadcast variants were kept only for diagnostics because they did not make the guest start reliably.
+`GameStartSyncMode original` relays the host's exact `0x0FFF` start packet to
+the other clients in the same room. The 2026-06-06 04:29 test proved the
+direct room UDP path can keep both members present, but the guest still did not
+start because the dummy server logged `Game start relay suppressed` for the
+host's `0x0FFF` packet.
+
+If a future test shows duplicate countdowns or a regression, temporarily start
+the server with:
+
+```powershell
+.\Start-RhakMuDummyServer.ps1 -AutoReply none -GameStartSyncMode none
+```
 
 If one host direction starts both clients but the other direction starts only the host, check the room host IP printed by the server:
 

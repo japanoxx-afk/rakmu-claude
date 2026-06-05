@@ -33,7 +33,7 @@ param(
     [string]$TranscriptPath = ".\rhakmu_dummy_server_terminal.log",
     [bool]$EnableUdpRelay = $true,
     [ValidateSet("none", "original", "original-plus-accept", "accept-only", "original-plus-variants")]
-    [string]$GameStartSyncMode = "none",
+    [string]$GameStartSyncMode = "original",
     [switch]$AcceptLikelyAccountPackets
 )
 
