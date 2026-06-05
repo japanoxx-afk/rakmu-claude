@@ -327,3 +327,26 @@ Apply it after replacing or restoring `Rhakmu.exe`:
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File .\Patch-RhakMuMenuDeleteGuards.ps1
 ```
+
+## Match Cleanup Packet Notes
+
+Observed during or immediately after a match:
+
+```text
+client -> server: FF 27 04 00
+old reply:        FF 26 06 00 02 00
+```
+
+The old `0x26FF` cleanup reply can be interpreted by the client as a battle
+request reply and route through `TNPacket_ReplyBattleReqReply()` into
+`TNPacket_ReqRoomJoin()`. That can crash in:
+
+```text
+iCARUS.dll, classSTB::SetIndexPosition()
+Rhakmu.exe, TNPacket_ReqRoomJoin()
+Rhakmu.exe, TNPacket_ReplyBattleReqReply()
+```
+
+The dummy server now suppresses replies to `0x27FF`. It also ignores the
+post-game `0x10FF 00 30 00` room reentry probe instead of treating it as a
+normal battlefield room join.

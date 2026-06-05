@@ -590,14 +590,17 @@ function New-RhakMuProtocolReplies([byte[]]$Packet) {
         $replies.Add((New-TgPacket 0x21FF ([byte[]]@())))
     }
 
-    # Observed around battle/game cleanup. Client-side receive handlers exist
-    # for 0x25FF and 0x26FF, not for 0x24FF/0x27FF themselves.
+    # Observed around battle/game cleanup. 0x24FF tolerates a compact 0x25FF
+    # result. 0x27FF is different: replying with 0x26FF 02 00 can route the
+    # client through TNPacket_ReplyBattleReqReply -> TNPacket_ReqRoomJoin and
+    # crash in classSTB::SetIndexPosition while returning from the match.
     if ($reqType -eq 0x24FF) {
         $replies.Add((New-TgPacket 0x25FF (New-ByteNulPayload 2)))
     }
 
     if ($reqType -eq 0x27FF) {
-        $replies.Add((New-TgPacket 0x26FF (New-ByteNulPayload 2)))
+        $now = Get-NowStamp
+        Write-Host "[$now] TCP suppress 0x27FF cleanup reply peer=${script:CurrentConnKey} account=${script:CurrentAccount} room=${script:CurrentRoomTitle}" -ForegroundColor DarkYellow
     }
 
     # Observed lobby chat request:
@@ -1041,11 +1044,16 @@ try {
                             }
 
                             if ($reqType -eq 0x10FF) {
-                                $room = Find-RoomForJoin $packet
-                                if ($null -ne $room) {
-                                    $conn.RoomTitle = $room.Title
+                                if (Test-PostGameRoomReentryPacket $packet) {
                                     $now = Get-NowStamp
-                                    Write-Host "[$now] Client room joined peer=$($conn.Peer) account=$($conn.Account) room=$($conn.RoomTitle)" -ForegroundColor Green
+                                    Write-Host "[$now] Client post-game room reentry ignored peer=$($conn.Peer) account=$($conn.Account) room=$($conn.RoomTitle)" -ForegroundColor DarkYellow
+                                } else {
+                                    $room = Find-RoomForJoin $packet
+                                    if ($null -ne $room) {
+                                        $conn.RoomTitle = $room.Title
+                                        $now = Get-NowStamp
+                                        Write-Host "[$now] Client room joined peer=$($conn.Peer) account=$($conn.Account) room=$($conn.RoomTitle)" -ForegroundColor Green
+                                    }
                                 }
                             }
 
