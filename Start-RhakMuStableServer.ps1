@@ -1,7 +1,6 @@
 param(
     [string]$Bind = "0.0.0.0",
-    [int[]]$TcpPorts = @(11223),
-    [int[]]$UdpPorts = @(11223),
+    [int[]]$Ports = @(11223),
     [string]$LogDir = ".\rhakmu_dummy_logs",
     [ValidateSet("original", "original-plus-sync-ok", "none", "original-plus-accept", "accept-only", "original-plus-stage8", "original-plus-delayed-stage8", "original-plus-variants")]
     [string]$GameStartSyncMode = "original-plus-sync-ok",
@@ -22,18 +21,20 @@ Get-CimInstance Win32_Process |
     }
 
 Write-Host "Starting RhakMu stable multiplayer server profile..." -ForegroundColor Green
-Write-Host "RoomJoinIdentityMode: host" -ForegroundColor Cyan
+Write-Host "Ports: $($Ports -join ', ')" -ForegroundColor Cyan
+Write-Host "RoomJoinIdentityMode: joiner" -ForegroundColor Cyan
 Write-Host "GameStartSyncMode: $GameStartSyncMode" -ForegroundColor Cyan
 Write-Host "StartTraceWindowSec: $StartTraceWindowSec" -ForegroundColor Cyan
 Write-Host "ChannelUserListReplyMode: members" -ForegroundColor Cyan
+Write-Host "SkipUdpPorts: 11223 (game clients handle UDP directly)" -ForegroundColor Cyan
 
 & (Join-Path $root "Start-RhakMuDummyServer.ps1") `
     -Bind $Bind `
-    -TcpPorts $TcpPorts `
-    -UdpPorts $UdpPorts `
+    -Ports $Ports `
+    -SkipUdpPorts @(11223) `
     -LogDir $LogDir `
     -AutoReply none `
-    -RoomJoinIdentityMode host `
+    -RoomJoinIdentityMode joiner `
     -GameStartSyncMode $GameStartSyncMode `
     -StartTraceWindowSec $StartTraceWindowSec `
     -ChannelUserListReplyMode members
