@@ -767,19 +767,9 @@ function New-RhakMuProtocolReplies([byte[]]$Packet) {
                 # initializes its own room socket state; keep host mode available
                 # for comparing older slot/race behavior.
                 $replyAccount = Get-RoomJoinReplyAccount $room
-                # In joiner mode the reply carries the joining client's own
-                # account and IP so its room socket initializes as a guest
-                # peer. In host mode (legacy) the reply carries the host's
-                # account and IP, which causes the guest to try a direct
-                # connection to the host instead of using its own identity.
-                $replyHostAddr = if ($script:RoomJoinIdentityMode -eq "joiner") {
-                    Resolve-RoomHost $script:CurrentHost
-                } else {
-                    $room.Host
-                }
                 $now = Get-NowStamp
-                Write-ServerEvent "[$now] Room join reply identity mode=$script:RoomJoinIdentityMode account=$replyAccount replyIP=$replyHostAddr host=$($room.Host) room=$($room.Title)" ([ConsoleColor]::DarkCyan)
-                $replies.Add((New-TgPacket 0x10FF (New-RoomJoinPayload $replyAccount $replyHostAddr -PreserveHostAddress)))
+                Write-ServerEvent "[$now] Room join reply identity mode=$script:RoomJoinIdentityMode account=$replyAccount host=$($room.Host) room=$($room.Title)" ([ConsoleColor]::DarkCyan)
+                $replies.Add((New-TgPacket 0x10FF (New-RoomJoinPayload $replyAccount $room.Host -PreserveHostAddress)))
             }
         }
     }
@@ -1591,7 +1581,6 @@ try {
                                 }
                             }
 
-                            $joinedRoom = $null
                             if ($reqType -eq 0x10FF) {
                                 if (Test-PostGameRoomReentryPacket $packet) {
                                     $now = Get-NowStamp
@@ -1604,25 +1593,12 @@ try {
                                         $now = Get-NowStamp
                                         Write-Host "[$now] Client room joined peer=$($conn.Peer) account=$($conn.Account) room=$($conn.RoomTitle) hostAccount=$($room.Owner) host=$($room.Host)" -ForegroundColor Green
                                         Send-RoomMemberListBroadcast $conn $room "room-join"
-                                        $joinedRoom = $room
                                     }
                                 }
                             }
 
                             foreach ($reply in $replySet) {
                                 Send-TcpPacket $conn $reply "tcp-reply"
-                            }
-
-                            # Send member list to the joiner after the join reply so the
-                            # client transitions from "joining" to "joined" lobby state.
-                            if ($null -ne $joinedRoom) {
-                                $joinerPackets = New-Object System.Collections.Generic.List[byte[]]
-                                Add-ChannelUserListReplies $joinerPackets $joinedRoom
-                                $now = Get-NowStamp
-                                Write-Host "[$now] Room member-list sent to joiner peer=$($conn.Peer) account=$($conn.Account) room=$($conn.RoomTitle) count=$($joinerPackets.Count)" -ForegroundColor Cyan
-                                foreach ($mp in $joinerPackets) {
-                                    Send-TcpPacket $conn $mp "tcp-room-members-joiner"
-                                }
                             }
 
                             if ($reqType -eq 0x12FF) {
