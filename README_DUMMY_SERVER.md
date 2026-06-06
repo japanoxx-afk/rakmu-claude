@@ -290,17 +290,15 @@ Current default:
 The stable multiplayer profile is:
 
 ```powershell
-.\Start-RhakMuDummyServer.ps1 -AutoReply none -RoomJoinIdentityMode host -GameStartSyncMode original-plus-delayed-stage8 -DelayedStartStage8Ms 12000 -ChannelUserListReplyMode members
+.\Start-RhakMuDummyServer.ps1 -AutoReply none -RoomJoinIdentityMode host -GameStartSyncMode original-plus-sync-ok -ChannelUserListReplyMode members
 ```
 
 This intentionally keeps the 34e85ea room identity behavior: room-join replies
-use the room owner's identity. The 2026-06-07 01:33 trace showed that the server
-did deliver the original `0x0FFF 02 00 00` start packet to the guest, but the
-guest still did not enter countdown. Older traces showed a later
-`0x0FFF 02 08 00` transition after the host countdown, so the stable profile now
-relays the original start packet immediately and schedules that stage-8 packet
-12 seconds later. It still avoids the broader experimental accept/action
-variants.
+use the room owner's identity. A full-log comparison showed that earlier
+near-working sessions relayed the original `0x0FFF 02 00 00` packet and then a
+6-byte `0x0FFF 00 02` sync-ok packet (`FF 0F 06 00 00 02`) to the other room
+member. The stable profile restores that narrow pair and avoids the broader
+experimental accept/stage variants.
 
 If one host direction starts both clients but the other direction starts only the host, check the room host IP printed by the server:
 
@@ -581,18 +579,16 @@ Expected startup lines:
 
 ```text
 RoomJoinIdentityMode: host
-GameStartSyncMode: original-plus-delayed-stage8
-DelayedStartStage8Ms: 12000
+GameStartSyncMode: original-plus-sync-ok
 ChannelUserListReplyMode: members
 ```
 
 Expected start-button lines:
 
 ```text
-Game start sync mode=original-plus-delayed-stage8 ...
+Game start sync mode=original-plus-sync-ok ...
 Room broadcast delivered ... reason=game-start-original
-Room broadcast scheduled ... reason=game-start-stage8-delayed delayMs=12000
-Room broadcast delivered ... reason=game-start-stage8-delayed
+Room broadcast delivered ... reason=game-start-sync-ok
 ```
 
 When experimenting, `-GameStartSyncMode original-plus-variants` makes the host

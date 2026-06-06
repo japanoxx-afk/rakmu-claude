@@ -38,7 +38,7 @@ param(
     [string]$TranscriptPath = ".\rhakmu_dummy_server_terminal.log",
     [string]$EventLogPath = ".\rhakmu_dummy_server_events.log",
     [bool]$EnableUdpRelay = $true,
-    [ValidateSet("none", "original", "original-plus-accept", "accept-only", "original-plus-stage8", "original-plus-delayed-stage8", "original-plus-variants")]
+    [ValidateSet("none", "original", "original-plus-sync-ok", "original-plus-accept", "accept-only", "original-plus-stage8", "original-plus-delayed-stage8", "original-plus-variants")]
     [string]$GameStartSyncMode = "none",
     [int]$DelayedStartStage8Ms = 12000,
     [switch]$AcceptLikelyAccountPackets
@@ -1148,8 +1148,12 @@ function Send-GameStartSync(
         return
     }
 
-    if ($script:GameStartSyncMode -eq "original" -or $script:GameStartSyncMode -eq "original-plus-accept" -or $script:GameStartSyncMode -eq "original-plus-stage8" -or $script:GameStartSyncMode -eq "original-plus-delayed-stage8" -or $script:GameStartSyncMode -eq "original-plus-variants") {
+    if ($script:GameStartSyncMode -eq "original" -or $script:GameStartSyncMode -eq "original-plus-sync-ok" -or $script:GameStartSyncMode -eq "original-plus-accept" -or $script:GameStartSyncMode -eq "original-plus-stage8" -or $script:GameStartSyncMode -eq "original-plus-delayed-stage8" -or $script:GameStartSyncMode -eq "original-plus-variants") {
         Send-RoomBroadcast $Sender $Packet "game-start-original"
+    }
+
+    if ($script:GameStartSyncMode -eq "original-plus-sync-ok") {
+        Send-RoomBroadcast $Sender (New-TgPacket 0x0FFF ([byte[]]@(0, 2))) "game-start-sync-ok"
     }
 
     if (($script:GameStartSyncMode -eq "accept-only" -or $script:GameStartSyncMode -eq "original-plus-accept" -or $script:GameStartSyncMode -eq "original-plus-variants") -and $Packet.Length -ge 7) {

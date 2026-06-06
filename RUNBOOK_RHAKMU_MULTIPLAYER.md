@@ -29,8 +29,7 @@ Game start relay suppressed ...
 
 ```text
 RoomJoinIdentityMode: host
-GameStartSyncMode: original-plus-delayed-stage8
-DelayedStartStage8Ms: 12000
+GameStartSyncMode: original-plus-sync-ok
 ChannelUserListReplyMode: members
 ```
 
@@ -55,7 +54,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\Install-RhakMuClientPatche
 마지막 줄이 아래처럼 나와야 합니다.
 
 ```text
-RhakMu patch bundle version: 2026-06-07.0145
+RhakMu patch bundle version: 2026-06-07.0200
 ```
 
 ## 2. 양쪽 PC에서 캡처 시작
@@ -87,8 +86,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\Start-RhakMuStableServer.p
 
 ```text
 RoomJoinIdentityMode: host
-GameStartSyncMode: original-plus-delayed-stage8
-DelayedStartStage8Ms: 12000
+GameStartSyncMode: original-plus-sync-ok
 ChannelUserListReplyMode: members
 ```
 
@@ -101,15 +99,14 @@ ChannelUserListReplyMode: members
 Start 버튼을 누를 때 더미서버에는 아래처럼 나와야 정상입니다.
 
 ```text
-Game start sync mode=original-plus-delayed-stage8 ...
+Game start sync mode=original-plus-sync-ok ...
 Room broadcast delivered ... reason=game-start-original
-Room broadcast scheduled ... reason=game-start-stage8-delayed delayMs=12000
-Room broadcast delivered ... reason=game-start-stage8-delayed
+Room broadcast delivered ... reason=game-start-sync-ok
 ```
 
 `game-start-accept-variant` 또는 `game-start-stage8-variant`가 보이면 실험용
 프로필로 실행된 것입니다. 정상 테스트에서는 `game-start-original`과
-`game-start-stage8-delayed`만 확인합니다.
+`game-start-sync-ok`만 확인합니다.
 
 ## 5. 테스트 후 양쪽 PC에서 캡처 종료
 
