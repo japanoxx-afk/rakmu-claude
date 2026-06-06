@@ -409,13 +409,13 @@ That points to a direct connectivity/NAT/firewall difference between the two hos
 
 Room join reply detail:
 
-- `0x10FF` success replies send the joining account plus the room host IP by
-  default. This is controlled by `-RoomJoinIdentityMode joiner`.
-- If a test regresses into wrong player slot/race mapping, compare with the
-  older owner/host identity behavior:
+- `0x10FF` success replies send the room owner/host account plus the room host
+  IP by default. This is controlled by `-RoomJoinIdentityMode host`.
+- If room entry works but the guest leaves after 10-20 seconds, compare with
+  the joining-account identity behavior:
 
 ```powershell
-.\Start-RhakMuDummyServer.ps1 -AutoReply none -RoomJoinIdentityMode host
+.\Start-RhakMuDummyServer.ps1 -AutoReply none -RoomJoinIdentityMode joiner
 ```
 
 - The server logs each join reply as `Room join reply identity mode=...` so the
@@ -462,18 +462,19 @@ Room presence/timeout notes:
   otherwise receive room-member broadcasts and leave dead peers mixed into the
   room state.
 - `0x1FFF` channel-user-list requests return the current lobby/member list by
-  default. Room-specific member-list broadcasts are not sent on join by default
-  because the 10-20 second room timeout traces showed the clients still rely on
-  their direct UDP peer check. To re-enable that experimental behavior, start
-  the server with `-BroadcastRoomMemberListOnJoin`.
+  default. Room-specific member-list broadcasts are sent on join by default.
+  This matches the 2026-06-06 04:55 trace where `TCP-ROOM-MEMBERS` was sent to
+  the host and the later `0x0FFF` game-start packet was relayed to the guest.
+  To disable that experimental behavior for comparison, start the server with
+  `-SuppressRoomMemberListOnJoin`.
 - If a room member disappears after 10-20 seconds, inspect UDP capture output
   first. Any repeated traffic to `192.168.*`, `172.16.*`, `10.*`, VMware,
   VirtualBox, Hyper-V, or host-only adapter addresses means the client picked
   the wrong network interface for peer checks.
 - If one side sends only a few UDP packets and then the peer repeats keepalive
-  packets until timeout, test `-RoomJoinIdentityMode joiner` first. That mode
-  makes the guest initialize its own room peer identity instead of inheriting
-  the host account from the join reply.
+  packets until timeout, compare the default mode with
+  `-RoomJoinIdentityMode joiner`. The default keeps the older host-account join
+  identity that matched the 04:55 room-start relay trace.
 
 ## Client Patch Verification
 
