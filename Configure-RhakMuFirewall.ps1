@@ -1,6 +1,7 @@
 param(
     [string]$GameDir = "C:\Program Files (x86)\TriggerSoft\RhakMu",
-    [string]$RemoteAddress = "Any"
+    [string]$RemoteAddress = "Any",
+    [switch]$RadminOnly
 )
 
 $ErrorActionPreference = "Stop"
@@ -42,6 +43,8 @@ if (Test-Path -LiteralPath $launcherPath) {
 }
 
 $rules = New-Object System.Collections.Generic.List[hashtable]
+$privatePeerRanges = @("10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16")
+$radminPeerRange = "26.0.0.0/8"
 
 foreach ($program in $programs) {
     $name = [IO.Path]::GetFileNameWithoutExtension($program)
@@ -79,6 +82,50 @@ foreach ($program in $programs) {
             RemotePort = $ports
             RemoteAddress = $RemoteAddress
             Action = "Allow"
+            Profile = "Any"
+        })
+    }
+
+    if ($RadminOnly) {
+        $rules.Add(@{
+            DisplayName = "RhakMu $name RadminOnly Allow UDP11223 Inbound"
+            Direction = "Inbound"
+            Program = $program
+            Protocol = "UDP"
+            LocalPort = "11223"
+            RemoteAddress = $radminPeerRange
+            Action = "Allow"
+            Profile = "Any"
+            EdgeTraversalPolicy = "Allow"
+        })
+        $rules.Add(@{
+            DisplayName = "RhakMu $name RadminOnly Allow UDP11223 Outbound"
+            Direction = "Outbound"
+            Program = $program
+            Protocol = "UDP"
+            RemotePort = "11223"
+            RemoteAddress = $radminPeerRange
+            Action = "Allow"
+            Profile = "Any"
+        })
+        $rules.Add(@{
+            DisplayName = "RhakMu $name RadminOnly Block Private UDP11223 Inbound"
+            Direction = "Inbound"
+            Program = $program
+            Protocol = "UDP"
+            LocalPort = "11223"
+            RemoteAddress = $privatePeerRanges
+            Action = "Block"
+            Profile = "Any"
+        })
+        $rules.Add(@{
+            DisplayName = "RhakMu $name RadminOnly Block Private UDP11223 Outbound"
+            Direction = "Outbound"
+            Program = $program
+            Protocol = "UDP"
+            RemotePort = "11223"
+            RemoteAddress = $privatePeerRanges
+            Action = "Block"
             Profile = "Any"
         })
     }
@@ -136,6 +183,8 @@ foreach ($name in $legacyRuleNames) {
     }
 }
 
+Get-NetFirewallRule -DisplayName "RhakMu * RadminOnly * UDP11223 *" -ErrorAction SilentlyContinue | Remove-NetFirewallRule
+
 foreach ($rule in $rules) {
     $existing = Get-NetFirewallRule -DisplayName $rule.DisplayName -ErrorAction SilentlyContinue
     if ($existing) {
@@ -144,6 +193,10 @@ foreach ($rule in $rules) {
 
     New-NetFirewallRule @rule | Out-Null
     Write-Host "Installed firewall rule: $($rule.DisplayName)"
+}
+
+if ($RadminOnly) {
+    Write-Host "RadminOnly mode enabled: RhakMu UDP 11223 is allowed for 26.0.0.0/8 and blocked for private LAN ranges." -ForegroundColor Green
 }
 
 Write-Host "Done. Run this on every PC that can host or join a RhakMu match."

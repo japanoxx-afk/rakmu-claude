@@ -44,6 +44,18 @@ Run this on both PCs before multiplayer tests:
 powershell -NoProfile -ExecutionPolicy Bypass -File .\Install-RhakMuClientPatches.ps1
 ```
 
+For restoration tests that must behave like remote PCs, force RhakMu peer UDP to
+use Radmin VPN instead of the local LAN:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\Install-RhakMuClientPatches.ps1 -RadminOnly
+```
+
+`-RadminOnly` allows RhakMu UDP `11223` to Radmin's `26.0.0.0/8` range and
+blocks RhakMu UDP `11223` to private LAN ranges (`192.168.*`, `10.*`,
+`172.16-31.*`). Run it on every PC before testing. This is the preferred
+multiplayer test mode because distant PCs will not share a `192.168.*` LAN.
+
 If the same timeout continues, temporarily disable VMware/VirtualBox/Hyper-V
 host-only adapters for the RhakMu test:
 
@@ -331,16 +343,20 @@ That `host=` value is what the guest receives in the battlefield list and room j
 ```
 
 When UDP capture shows the clients are actually exchanging peer packets on LAN
-addresses instead of Radmin VPN addresses, force per-account room host
-addresses. The 2026-06-06 04:41 capture showed direct UDP on
-`192.168.0.8 <-> 192.168.0.22`, so test with:
+addresses instead of Radmin VPN addresses, first run the client setup with
+`-RadminOnly` on both PCs. Then start the server with Radmin per-account room
+host addresses:
 
 ```powershell
-.\Start-RhakMuDummyServer.ps1 -AutoReply none -RoomHostOverrides "test1=192.168.0.8","test2=192.168.0.22"
+.\Start-RhakMuDummyServer.ps1 -AutoReply none -RoomHostOverrides "test1=26.240.153.112","test2=26.157.67.215"
 ```
 
 The server prints `RoomHostOverrides:` at startup and applies these addresses
 to room-list, room-join, and room-member payloads for the matching accounts.
+
+LAN overrides such as `test1=192.168.0.8` are useful only as a short local
+diagnostic. Do not use them for restoration validation because distant PCs will
+not have that route.
 
 The 2026-06-05 21:24-21:26 test showed:
 
@@ -379,6 +395,12 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\Configure-RhakMuFirewall.p
 ```
 
 Run this on every PC. If a PC can connect to the lobby but cannot receive countdown/game packets when it hosts, Windows firewall or the selected host IP is the first thing to check.
+
+Radmin-only firewall setup:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\Configure-RhakMuFirewall.ps1 -RadminOnly
+```
 
 Room presence/timeout notes:
 
