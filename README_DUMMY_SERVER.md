@@ -284,10 +284,13 @@ This mode replies to account-looking packets with several success candidates. On
 Current default:
 
 ```powershell
-.\Start-RhakMuDummyServer.ps1 -AutoReply none -GameStartSyncMode none
+.\Start-RhakMuDummyServer.ps1 -AutoReply none -GameStartSyncMode original-plus-stage8
 ```
 
-`GameStartSyncMode none` is intentional. In the 2026-06-04 23:55 capture, both clients reached countdown/game without the dummy server relaying `0x0FFF`; the start signal was handled by the clients' direct room/game path. Server-side `0x0FFF` broadcast variants were kept only for diagnostics because they did not make the guest start reliably.
+`GameStartSyncMode original-plus-stage8` relays the host's `0x0FFF` start packet
+and two observed/likely follow-up variants to the other clients in the same
+room: `02 01 00` and `02 08 00`. The latter matches the second start-stage
+payload seen in earlier traces after the host-side countdown.
 
 If one host direction starts both clients but the other direction starts only the host, check the room host IP printed by the server:
 
@@ -549,12 +552,13 @@ Room/game synchronization often appears on UDP port `7000` as raw one-byte
 datagrams, so relaying them helps when direct peer-to-peer room traffic is not
 passing between clients.
 
-The server also has `-GameStartSyncMode`, defaulting to `none`. In the
-2026-06-04 23:55 working-ish two-PC trace, both clients reached the game without
-the dummy server broadcasting `0x0FFF`; the start appears to have traveled over
-the clients' direct room/game path instead. Because later server-side `0x0FFF`
-variants did not start the guest and could destabilize the host, the dummy
-server no longer relays start packets by default.
+The server also has `-GameStartSyncMode`, defaulting to
+`original-plus-stage8`. In the 2026-06-06 22:19 trace, the host's original
+`0x0FFF 02 00 00` start packet was delivered to the guest, but the guest did not
+enter countdown and later returned to the lobby. Earlier traces showed a second
+host-side start-stage payload, `0x0FFF 02 08 00`, after countdown. The current
+default therefore relays the original start packet plus the narrow `02 01 00`
+and `02 08 00` variants.
 
 When experimenting, `-GameStartSyncMode original-plus-variants` makes the host
 packet:
@@ -567,6 +571,7 @@ relay as the original packet plus several narrow status/action variants:
 
 ```text
 FF 0F 07 00 02 01 00
+FF 0F 07 00 02 08 00
 FF 0F 07 00 01 00 00
 FF 0F 07 00 01 01 00
 FF 0F 07 00 00 01 00
@@ -579,12 +584,13 @@ it only for controlled diagnosis. The server log then shows:
 ```text
 reason=game-start-original
 reason=game-start-accept-variant
+reason=game-start-stage8-variant
 reason=game-start-action1-status0
 reason=game-start-action1-status1
 reason=game-start-action0-status1
 ```
 
-With the default `none` mode, the log shows:
+With `-GameStartSyncMode none`, the log shows:
 
 ```text
 Game start relay suppressed

@@ -38,8 +38,8 @@ param(
     [string]$TranscriptPath = ".\rhakmu_dummy_server_terminal.log",
     [string]$EventLogPath = ".\rhakmu_dummy_server_events.log",
     [bool]$EnableUdpRelay = $true,
-    [ValidateSet("none", "original", "original-plus-accept", "accept-only", "original-plus-variants")]
-    [string]$GameStartSyncMode = "original",
+    [ValidateSet("none", "original", "original-plus-accept", "accept-only", "original-plus-stage8", "original-plus-variants")]
+    [string]$GameStartSyncMode = "original-plus-stage8",
     [switch]$AcceptLikelyAccountPackets
 )
 
@@ -1114,7 +1114,7 @@ function Send-GameStartSync(
         return
     }
 
-    if ($script:GameStartSyncMode -eq "original" -or $script:GameStartSyncMode -eq "original-plus-accept" -or $script:GameStartSyncMode -eq "original-plus-variants") {
+    if ($script:GameStartSyncMode -eq "original" -or $script:GameStartSyncMode -eq "original-plus-accept" -or $script:GameStartSyncMode -eq "original-plus-stage8" -or $script:GameStartSyncMode -eq "original-plus-variants") {
         Send-RoomBroadcast $Sender $Packet "game-start-original"
     }
 
@@ -1123,6 +1123,22 @@ function Send-GameStartSync(
         [Array]::Copy($Packet, 0, $acceptPacket, 0, $Packet.Length)
         $acceptPacket[5] = 1
         Send-RoomBroadcast $Sender $acceptPacket "game-start-accept-variant"
+    }
+
+    if (($script:GameStartSyncMode -eq "original-plus-stage8" -or $script:GameStartSyncMode -eq "original-plus-variants") -and $Packet.Length -ge 7) {
+        if ($script:GameStartSyncMode -eq "original-plus-stage8") {
+            $acceptPacket = New-Object byte[] $Packet.Length
+            [Array]::Copy($Packet, 0, $acceptPacket, 0, $Packet.Length)
+            $acceptPacket[5] = 1
+            Send-RoomBroadcast $Sender $acceptPacket "game-start-accept-variant"
+        }
+
+        $stage8Packet = New-Object byte[] $Packet.Length
+        [Array]::Copy($Packet, 0, $stage8Packet, 0, $Packet.Length)
+        $stage8Packet[4] = 2
+        $stage8Packet[5] = 8
+        $stage8Packet[6] = 0
+        Send-RoomBroadcast $Sender $stage8Packet "game-start-stage8-variant"
     }
 
     if ($script:GameStartSyncMode -eq "original-plus-variants" -and $Packet.Length -ge 7) {

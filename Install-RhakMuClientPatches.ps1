@@ -7,6 +7,7 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+$PatchBundleVersion = "2026-06-06.2235"
 
 function Test-IsAdministrator {
     $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
@@ -89,3 +90,4 @@ Invoke-Step "Final patch verification" {
 Write-Host ""
 Write-Host "RhakMu client setup completed. Run this same script on every PC before testing multiplayer." -ForegroundColor Green
 Write-Host "If room members are still removed after 10-20 seconds, rerun with -DisableVirtualAdapters on both PCs." -ForegroundColor Yellow
+Write-Host "RhakMu patch bundle version: $PatchBundleVersion" -ForegroundColor Cyan
