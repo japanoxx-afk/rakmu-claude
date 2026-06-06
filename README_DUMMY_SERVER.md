@@ -284,15 +284,22 @@ This mode replies to account-looking packets with several success candidates. On
 Current default:
 
 ```powershell
-.\Start-RhakMuDummyServer.ps1 -AutoReply none -GameStartSyncMode none
+.\Start-RhakMuStableServer.ps1
 ```
 
-`GameStartSyncMode none` is intentional. The 34e85ea baseline reached
-simultaneous game entry when the remote PC hosted without server-side `0x0FFF`
-injection. In the 2026-06-06 22:33 trace, injecting the host's `0x0FFF` start
-packet and the `02 01 00` / `02 08 00` variants caused the guest to return to
-the lobby after about 13 seconds. Keep the dummy server out of the start path by
-default and let the clients' direct UDP room/game path drive countdown.
+The stable multiplayer profile is:
+
+```powershell
+.\Start-RhakMuDummyServer.ps1 -AutoReply none -RoomJoinIdentityMode host -GameStartSyncMode none -ChannelUserListReplyMode members
+```
+
+This intentionally matches the 34e85ea start behavior: room-join replies use the
+room owner's identity, and the dummy server does not inject TCP `0x0FFF` start
+packets. In the 2026-06-06 22:46 trace, `GameStartSyncMode none` correctly
+suppressed server-side start relay, but the guest still left after about 13
+seconds because the room-join identity was still `joiner`. The stable profile
+uses `host` identity to restore the successful host/guest relationship while
+keeping the direct UDP room/game start path.
 
 If one host direction starts both clients but the other direction starts only the host, check the room host IP printed by the server:
 
@@ -560,6 +567,29 @@ together. In later traces, server-side TCP injection of the host's
 `0x0FFF 02 00 00` start packet and the `02 01 00` / `02 08 00` variants reached
 the peer but did not trigger countdown; the peer returned to the lobby roughly
 13 seconds later. Treat `0x0FFF` relay modes as diagnostics only.
+
+For normal multiplayer testing, use:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\Start-RhakMuStableServer.ps1
+```
+
+For the full two-PC run order, see `RUNBOOK_RHAKMU_MULTIPLAYER.md`.
+
+Expected startup lines:
+
+```text
+RoomJoinIdentityMode: host
+GameStartSyncMode: none
+ChannelUserListReplyMode: members
+```
+
+Expected start-button lines:
+
+```text
+Game start sync mode=none ...
+Game start relay suppressed ...
+```
 
 When experimenting, `-GameStartSyncMode original-plus-variants` makes the host
 packet:
