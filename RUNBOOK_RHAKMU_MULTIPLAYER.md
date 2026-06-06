@@ -9,24 +9,27 @@
 
 ## 이 프로필을 쓰는 이유
 
-2026-06-06 22:46 로그에서는 더미서버가 시작 패킷을 끼워 넣지 않았습니다.
+2026-06-07 01:24 로그에서는 더미서버가 시작 패킷을 끼워 넣지 않았습니다.
 
 ```text
 Game start sync mode=none ... payload=02 00 00
 Game start relay suppressed ...
 ```
 
-그런데도 게스트가 약 13초 뒤 방에서 나갔습니다. 남은 차이는 방 입장 응답의
-identity였습니다.
+이 상태에서는 서버 PC가 방장일 때 방장만 시작했습니다. 방장 클라이언트는 자기
+로컬 상태로 바로 시작하지만, 게스트는 직접 UDP 경로만으로 카운트다운을 시작하지
+못했습니다. 그래서 현재 안정 프로필은 방장 identity를 유지하면서 원본 Start
+패킷만 게스트에게 릴레이합니다.
 
-- 실패 로그: 입장 응답 identity가 입장자 계정이었음
-- 정상 이력 `34e85ea`: 입장 응답 identity가 방장 계정이었음
+- 방 입장 응답 identity: 방장 계정
+- Start 릴레이: 원본 `0x0FFF 02 00 00`만 전달
+- 실험용 `02 01 00`, `02 08 00` 변형은 전달하지 않음
 
 그래서 안정 프로필은 아래 값으로 고정합니다.
 
 ```text
 RoomJoinIdentityMode: host
-GameStartSyncMode: none
+GameStartSyncMode: original
 ChannelUserListReplyMode: members
 ```
 
@@ -51,7 +54,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\Install-RhakMuClientPatche
 마지막 줄이 아래처럼 나와야 합니다.
 
 ```text
-RhakMu patch bundle version: 2026-06-06.2305
+RhakMu patch bundle version: 2026-06-07.0135
 ```
 
 ## 2. 양쪽 PC에서 캡처 시작
@@ -83,7 +86,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\Start-RhakMuStableServer.p
 
 ```text
 RoomJoinIdentityMode: host
-GameStartSyncMode: none
+GameStartSyncMode: original
 ChannelUserListReplyMode: members
 ```
 
@@ -96,17 +99,12 @@ ChannelUserListReplyMode: members
 Start 버튼을 누를 때 더미서버에는 아래처럼 나와야 정상입니다.
 
 ```text
-Game start sync mode=none ...
-Game start relay suppressed ...
+Game start sync mode=original ...
+Room broadcast delivered ... reason=game-start-original
 ```
 
-정상 테스트 중에는 아래 로그가 나오면 안 됩니다.
-
-```text
-TCP-ROOM-BROADCAST ... type=0x0FFF
-```
-
-이 줄이 보이면 더미서버가 잘못된 프로필로 실행된 것입니다.
+`game-start-accept-variant` 또는 `game-start-stage8-variant`가 보이면 실험용
+프로필로 실행된 것입니다. 정상 테스트에서는 `game-start-original`만 확인합니다.
 
 ## 5. 테스트 후 양쪽 PC에서 캡처 종료
 

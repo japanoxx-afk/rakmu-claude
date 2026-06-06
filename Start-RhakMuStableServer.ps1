@@ -20,7 +20,7 @@ Get-CimInstance Win32_Process |
 
 Write-Host "Starting RhakMu stable multiplayer server profile..." -ForegroundColor Green
 Write-Host "RoomJoinIdentityMode: host" -ForegroundColor Cyan
-Write-Host "GameStartSyncMode: none" -ForegroundColor Cyan
+Write-Host "GameStartSyncMode: original" -ForegroundColor Cyan
 Write-Host "ChannelUserListReplyMode: members" -ForegroundColor Cyan
 
 & (Join-Path $root "Start-RhakMuDummyServer.ps1") `
@@ -30,5 +30,5 @@ Write-Host "ChannelUserListReplyMode: members" -ForegroundColor Cyan
     -LogDir $LogDir `
     -AutoReply none `
     -RoomJoinIdentityMode host `
-    -GameStartSyncMode none `
+    -GameStartSyncMode original `
     -ChannelUserListReplyMode members

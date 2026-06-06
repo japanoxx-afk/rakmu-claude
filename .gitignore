@@ -1,5 +1,6 @@
 rhakmu_packet_logs/
 rhakmu_packet_captures/
+rhakmu_dummy_logs/
 analysis/
 third_party/
 downloaded_analysis_logs/

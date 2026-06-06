@@ -290,16 +290,15 @@ Current default:
 The stable multiplayer profile is:
 
 ```powershell
-.\Start-RhakMuDummyServer.ps1 -AutoReply none -RoomJoinIdentityMode host -GameStartSyncMode none -ChannelUserListReplyMode members
+.\Start-RhakMuDummyServer.ps1 -AutoReply none -RoomJoinIdentityMode host -GameStartSyncMode original -ChannelUserListReplyMode members
 ```
 
 This intentionally matches the 34e85ea start behavior: room-join replies use the
-room owner's identity, and the dummy server does not inject TCP `0x0FFF` start
-packets. In the 2026-06-06 22:46 trace, `GameStartSyncMode none` correctly
-suppressed server-side start relay, but the guest still left after about 13
-seconds because the room-join identity was still `joiner`. The stable profile
-uses `host` identity to restore the successful host/guest relationship while
-keeping the direct UDP room/game start path.
+room owner's identity. The 2026-06-07 01:24 trace then showed that with
+`GameStartSyncMode none`, the server-hosted room only started on the host. The
+stable profile therefore keeps host identity and relays only the original
+`0x0FFF 02 00 00` start packet to the other room member. It does not send the
+experimental accept/stage variants.
 
 If one host direction starts both clients but the other direction starts only the host, check the room host IP printed by the server:
 
@@ -580,15 +579,15 @@ Expected startup lines:
 
 ```text
 RoomJoinIdentityMode: host
-GameStartSyncMode: none
+GameStartSyncMode: original
 ChannelUserListReplyMode: members
 ```
 
 Expected start-button lines:
 
 ```text
-Game start sync mode=none ...
-Game start relay suppressed ...
+Game start sync mode=original ...
+Room broadcast delivered ... reason=game-start-original
 ```
 
 When experimenting, `-GameStartSyncMode original-plus-variants` makes the host
