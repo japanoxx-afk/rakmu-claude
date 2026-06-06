@@ -53,9 +53,11 @@ if (-not $SkipGitPull -and (Test-Path -LiteralPath (Join-Path $root ".git"))) {
 
 if (-not $SkipFirewall) {
     Invoke-Step "Firewall rules" {
-        $firewallArgs = @("-GameDir", $GameDir)
+        $firewallArgs = @{
+            GameDir = $GameDir
+        }
         if ($RadminOnly) {
-            $firewallArgs += "-RadminOnly"
+            $firewallArgs.RadminOnly = $true
         }
         & (Join-Path $root "Configure-RhakMuFirewall.ps1") @firewallArgs
     }
