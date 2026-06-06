@@ -472,9 +472,9 @@ Room presence/timeout notes:
   VirtualBox, Hyper-V, or host-only adapter addresses means the client picked
   the wrong network interface for peer checks.
 - If one side sends only a few UDP packets and then the peer repeats keepalive
-  packets until timeout, compare the default mode with
-  `-RoomJoinIdentityMode joiner`. The default keeps the older host-account join
-  identity that matched the 04:55 room-start relay trace.
+  packets until timeout, compare `-RoomJoinIdentityMode joiner` and
+  `-RoomJoinIdentityMode host`. The default is now `joiner` so the joining
+  client receives its own account identity while preserving the room host IP.
 - For the 10-20 second room removal test, start UDP capture on both PCs before
   creating the room and stop capture only after the guest has been removed or
   returned to the lobby. If one side is stopped before the join timestamp, that
@@ -506,6 +506,10 @@ Get-NetUDPEndpoint -LocalPort 11223 |
   records the RhakMu UDP owner, Radmin route, adapter metrics, bindings, and
   network filter drivers so the next capture can be diagnosed without separate
   manual commands.
+- `Start-RhakMuUdpCapture.ps1` also records
+  `rhakmu_udp_...endpoint-watch.txt` once per second while capture is active.
+  Use that file to confirm `Rhakmu` owned UDP `11223` during the failure, not
+  only after the client has already returned to lobby or exited.
 
 ## Client Patch Verification
 

@@ -62,6 +62,7 @@ $stamp = Get-Date -Format "yyyyMMdd_HHmmss"
 $baseName = "rhakmu_udp_${Port}_${safeIp}${labelPart}_$stamp"
 $etlPath = Join-Path $fullOutputDir "$baseName.etl"
 $metaPath = Join-Path $fullOutputDir "$baseName.meta.txt"
+$endpointWatchPath = Join-Path $fullOutputDir "$baseName.endpoint-watch.txt"
 $statePath = Join-Path $fullOutputDir "active_capture.txt"
 $stateJsonPath = Join-Path $fullOutputDir "active_capture.json"
 
@@ -95,12 +96,42 @@ $etlPath | Set-Content -LiteralPath $statePath -Encoding UTF8
     BaseName = $baseName
     EtlPath = $etlPath
     MetaPath = $metaPath
+    EndpointWatchPath = $endpointWatchPath
 } | ConvertTo-Json | Set-Content -LiteralPath $stateJsonPath -Encoding UTF8
+
+$watchScript = @'
+param(
+    [string]$StatePath,
+    [string]$OutPath,
+    [int]$Port
+)
+
+while (Test-Path -LiteralPath $StatePath) {
+    $now = Get-Date -Format 'yyyy-MM-dd HH:mm:ss.fff'
+    Add-Content -LiteralPath $OutPath -Encoding UTF8 -Value "===== $now ====="
+    try {
+        $rows = Get-NetUDPEndpoint -LocalPort $Port -ErrorAction SilentlyContinue |
+            Select-Object LocalAddress, LocalPort, OwningProcess,
+                @{Name = "Process"; Expression = { (Get-Process -Id $_.OwningProcess -ErrorAction SilentlyContinue).ProcessName } } |
+            Format-Table -AutoSize | Out-String -Width 220
+        if ([string]::IsNullOrWhiteSpace($rows)) {
+            $rows = "(no UDP endpoint on port $Port)`r`n"
+        }
+        Add-Content -LiteralPath $OutPath -Encoding UTF8 -Value $rows.TrimEnd()
+    } catch {
+        Add-Content -LiteralPath $OutPath -Encoding UTF8 -Value "ERROR: $($_.Exception.Message)"
+    }
+    Start-Sleep -Seconds 1
+}
+'@
+$watcherCommand = "& { $watchScript } -StatePath '$($statePath -replace '''','''''')' -OutPath '$($endpointWatchPath -replace '''','''''')' -Port $Port"
+Start-Process -FilePath "powershell" -ArgumentList @("-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", $watcherCommand) -WindowStyle Hidden | Out-Null
 
 Write-Host "RhakMu UDP capture started." -ForegroundColor Green
 Write-Host "Port: $Port"
 Write-Host "LocalIp: $localIpValue"
 Write-Host "ETL: $etlPath"
+Write-Host "Endpoint watch: $endpointWatchPath"
 Write-Host "Git log folder: $(Join-Path $resolvedLogsRoot $safeIp)"
 Write-Host ""
 Write-Host "Now reproduce the room join timeout. After test2 is removed, run:" -ForegroundColor Yellow

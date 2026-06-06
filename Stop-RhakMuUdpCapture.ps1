@@ -168,6 +168,12 @@ if ($null -ne $captureState -and -not [string]::IsNullOrWhiteSpace($captureState
         $copied.Add((Join-Path $sessionDir ([IO.Path]::GetFileName($metaSource))))
     }
 }
+if ($null -ne $captureState -and -not [string]::IsNullOrWhiteSpace($captureState.EndpointWatchPath)) {
+    $watchSource = [string]$captureState.EndpointWatchPath
+    if (Copy-IfExists $watchSource (Join-Path $sessionDir ([IO.Path]::GetFileName($watchSource)))) {
+        $copied.Add((Join-Path $sessionDir ([IO.Path]::GetFileName($watchSource))))
+    }
+}
 
 $dummyLogs = @(
     @{ Source = ".\rhakmu_dummy_server_events.log"; Name = "${baseName}_dummy_server_events.txt" },

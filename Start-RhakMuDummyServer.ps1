@@ -29,7 +29,7 @@ param(
     [string]$RoomJoinHost = "127.0.0.1",
     [string[]]$RoomHostOverrides = @(),
     [ValidateSet("joiner", "host")]
-    [string]$RoomJoinIdentityMode = "host",
+    [string]$RoomJoinIdentityMode = "joiner",
     [ValidateSet("ignore", "empty", "members")]
     [string]$ChannelUserListReplyMode = "members",
     [switch]$BroadcastRoomMemberListOnJoin,
