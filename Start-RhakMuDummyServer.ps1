@@ -28,6 +28,8 @@ param(
     [switch]$SendRoomJoinAfterMake,
     [string]$RoomJoinHost = "127.0.0.1",
     [string[]]$RoomHostOverrides = @(),
+    [ValidateSet("joiner", "host")]
+    [string]$RoomJoinIdentityMode = "joiner",
     [ValidateSet("ignore", "empty", "members")]
     [string]$ChannelUserListReplyMode = "members",
     [switch]$BroadcastRoomMemberListOnJoin,
@@ -297,14 +299,35 @@ function Get-RoomHostForAccount([string]$Account, [string]$FallbackHost) {
     return $FallbackHost
 }
 
-function New-RoomJoinPayload([string]$Account, [string]$HostAddress) {
+function New-RoomJoinPayload([string]$Account, [string]$HostAddress, [switch]$PreserveHostAddress) {
     if ([string]::IsNullOrWhiteSpace($Account)) { $Account = $script:TestAccount }
     if ([string]::IsNullOrWhiteSpace($HostAddress)) { $HostAddress = $script:RoomJoinHost }
-    $HostAddress = Get-RoomHostForAccount $Account $HostAddress
+    if (-not $PreserveHostAddress) {
+        $HostAddress = Get-RoomHostForAccount $Account $HostAddress
+    }
     $result = [byte[]]@([byte]0)
     $accountBytes = New-NulStringBytes $Account
     $hostBytes = New-NulStringBytes $HostAddress
     return Join-ByteArrays @($result, $accountBytes, $hostBytes)
+}
+
+function Get-RoomJoinReplyAccount([object]$Room) {
+    if ($script:RoomJoinIdentityMode -eq "host") {
+        if ($null -ne $Room -and -not [string]::IsNullOrWhiteSpace($Room.Owner)) {
+            return $Room.Owner
+        }
+        return $script:TestAccount
+    }
+
+    if (-not [string]::IsNullOrWhiteSpace($script:CurrentAccount)) {
+        return $script:CurrentAccount
+    }
+
+    if ($null -ne $Room -and -not [string]::IsNullOrWhiteSpace($Room.Owner)) {
+        return $Room.Owner
+    }
+
+    return $script:TestAccount
 }
 
 function New-RoomFromCreatePacket([byte[]]$Packet) {
@@ -721,7 +744,7 @@ function New-RhakMuProtocolReplies([byte[]]$Packet) {
         $room = Register-RoomFromCreatePacket $Packet
         $replies.Add((New-TgPacket 0x0EFF ([BitConverter]::GetBytes([uint32]$script:RoomMakeResult))))
         if ($script:RoomMakeResult -eq 0 -and $script:SendRoomJoinAfterMake) {
-            $replies.Add((New-TgPacket 0x10FF (New-RoomJoinPayload $room.Owner $room.Host)))
+            $replies.Add((New-TgPacket 0x10FF (New-RoomJoinPayload (Get-RoomJoinReplyAccount $room) $room.Host -PreserveHostAddress)))
         }
     }
 
@@ -736,10 +759,14 @@ function New-RhakMuProtocolReplies([byte[]]$Packet) {
             if ($null -eq $room) {
                 $replies.Add((New-TgPacket 0x10FF ([BitConverter]::GetBytes([uint32]1))))
             } else {
-                # The first string in the room-join reply is treated as the room host
-                # identity by the client-side room/game setup. Sending the joining
-                # account here can flip the local player slot at game start.
-                $replies.Add((New-TgPacket 0x10FF (New-RoomJoinPayload $room.Owner $room.Host)))
+                # The first string in the room-join reply affects the client's
+                # room peer identity. Default to the joining account so the guest
+                # initializes its own room socket state; keep host mode available
+                # for comparing older slot/race behavior.
+                $replyAccount = Get-RoomJoinReplyAccount $room
+                $now = Get-NowStamp
+                Write-ServerEvent "[$now] Room join reply identity mode=$script:RoomJoinIdentityMode account=$replyAccount host=$($room.Host) room=$($room.Title)" ([ConsoleColor]::DarkCyan)
+                $replies.Add((New-TgPacket 0x10FF (New-RoomJoinPayload $replyAccount $room.Host -PreserveHostAddress)))
             }
         }
     }
@@ -1267,6 +1294,7 @@ foreach ($entryGroup in @($RoomHostOverrides)) {
         $script:RoomHostOverrideMap[$accountOverride] = $hostOverride
     }
 }
+$script:RoomJoinIdentityMode = $RoomJoinIdentityMode
 $script:ChannelUserListReplyMode = $ChannelUserListReplyMode
 $script:BroadcastRoomMemberListOnJoin = [bool]$BroadcastRoomMemberListOnJoin
 $script:EnableUdpRelay = $EnableUdpRelay
@@ -1294,6 +1322,7 @@ Write-Host "RoomMakeResult: $RoomMakeResult"
 Write-Host "SendRoomJoinAfterMake: $([bool]$SendRoomJoinAfterMake)"
 Write-Host "RoomJoinHost: $script:RoomJoinHost"
 Write-Host "RoomHostOverrides: $(if ($script:RoomHostOverrideMap.Count -gt 0) { (($script:RoomHostOverrideMap.GetEnumerator() | ForEach-Object { "$($_.Key)=$($_.Value)" }) -join ', ') } else { '(none)' })"
+Write-Host "RoomJoinIdentityMode: $RoomJoinIdentityMode"
 Write-Host "SkipUdpPorts: $($SkipUdpPorts -join ',')"
 Write-Host "EnableUdpRelay: $([bool]$EnableUdpRelay)"
 Write-Host "GameStartSyncMode: $GameStartSyncMode"

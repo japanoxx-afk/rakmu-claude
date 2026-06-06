@@ -409,8 +409,17 @@ That points to a direct connectivity/NAT/firewall difference between the two hos
 
 Room join reply detail:
 
-- `0x10FF` success replies now send the room owner/host account plus the host IP.
-- Earlier builds sent the joining account in that field, which can let both clients enter the room but misalign the local player slot/race when the RTS match starts.
+- `0x10FF` success replies send the joining account plus the room host IP by
+  default. This is controlled by `-RoomJoinIdentityMode joiner`.
+- If a test regresses into wrong player slot/race mapping, compare with the
+  older owner/host identity behavior:
+
+```powershell
+.\Start-RhakMuDummyServer.ps1 -AutoReply none -RoomJoinIdentityMode host
+```
+
+- The server logs each join reply as `Room join reply identity mode=...` so the
+  capture bundle shows exactly which variant was tested.
 - Stale rooms are removed when the owner logs in again, creates a new room, or sends a crash report. Old room entries can otherwise leave stale player counts/room metadata visible in the battlefield list.
 
 One-step client setup:
@@ -461,6 +470,10 @@ Room presence/timeout notes:
   first. Any repeated traffic to `192.168.*`, `172.16.*`, `10.*`, VMware,
   VirtualBox, Hyper-V, or host-only adapter addresses means the client picked
   the wrong network interface for peer checks.
+- If one side sends only a few UDP packets and then the peer repeats keepalive
+  packets until timeout, test `-RoomJoinIdentityMode joiner` first. That mode
+  makes the guest initialize its own room peer identity instead of inheriting
+  the host account from the join reply.
 
 ## Client Patch Verification
 
