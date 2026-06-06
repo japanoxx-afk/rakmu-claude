@@ -39,7 +39,7 @@ param(
     [string]$EventLogPath = ".\rhakmu_dummy_server_events.log",
     [bool]$EnableUdpRelay = $true,
     [ValidateSet("none", "original", "original-plus-accept", "accept-only", "original-plus-stage8", "original-plus-variants")]
-    [string]$GameStartSyncMode = "original-plus-stage8",
+    [string]$GameStartSyncMode = "none",
     [switch]$AcceptLikelyAccountPackets
 )
 

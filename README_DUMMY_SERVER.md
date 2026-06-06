@@ -284,13 +284,15 @@ This mode replies to account-looking packets with several success candidates. On
 Current default:
 
 ```powershell
-.\Start-RhakMuDummyServer.ps1 -AutoReply none -GameStartSyncMode original-plus-stage8
+.\Start-RhakMuDummyServer.ps1 -AutoReply none -GameStartSyncMode none
 ```
 
-`GameStartSyncMode original-plus-stage8` relays the host's `0x0FFF` start packet
-and two observed/likely follow-up variants to the other clients in the same
-room: `02 01 00` and `02 08 00`. The latter matches the second start-stage
-payload seen in earlier traces after the host-side countdown.
+`GameStartSyncMode none` is intentional. The 34e85ea baseline reached
+simultaneous game entry when the remote PC hosted without server-side `0x0FFF`
+injection. In the 2026-06-06 22:33 trace, injecting the host's `0x0FFF` start
+packet and the `02 01 00` / `02 08 00` variants caused the guest to return to
+the lobby after about 13 seconds. Keep the dummy server out of the start path by
+default and let the clients' direct UDP room/game path drive countdown.
 
 If one host direction starts both clients but the other direction starts only the host, check the room host IP printed by the server:
 
@@ -552,13 +554,12 @@ Room/game synchronization often appears on UDP port `7000` as raw one-byte
 datagrams, so relaying them helps when direct peer-to-peer room traffic is not
 passing between clients.
 
-The server also has `-GameStartSyncMode`, defaulting to
-`original-plus-stage8`. In the 2026-06-06 22:19 trace, the host's original
-`0x0FFF 02 00 00` start packet was delivered to the guest, but the guest did not
-enter countdown and later returned to the lobby. Earlier traces showed a second
-host-side start-stage payload, `0x0FFF 02 08 00`, after countdown. The current
-default therefore relays the original start packet plus the narrow `02 01 00`
-and `02 08 00` variants.
+The server also has `-GameStartSyncMode`, defaulting to `none`. This matches the
+34e85ea baseline where the remote-hosted game could enter countdown/game
+together. In later traces, server-side TCP injection of the host's
+`0x0FFF 02 00 00` start packet and the `02 01 00` / `02 08 00` variants reached
+the peer but did not trigger countdown; the peer returned to the lobby roughly
+13 seconds later. Treat `0x0FFF` relay modes as diagnostics only.
 
 When experimenting, `-GameStartSyncMode original-plus-variants` makes the host
 packet:
@@ -590,7 +591,7 @@ reason=game-start-action1-status1
 reason=game-start-action0-status1
 ```
 
-With `-GameStartSyncMode none`, the log shows:
+With the default `none` mode, the log shows:
 
 ```text
 Game start relay suppressed
