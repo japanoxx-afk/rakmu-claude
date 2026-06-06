@@ -355,6 +355,16 @@ host addresses:
 
 The server prints `RoomHostOverrides:` at startup and applies these addresses
 to room-list, room-join, and room-member payloads for the matching accounts.
+Comma-separated override text is also accepted, which is useful when copying a
+single command line:
+
+```powershell
+.\Start-RhakMuDummyServer.ps1 -AutoReply none -RoomHostOverrides "test1=26.240.153.112,test2=26.157.67.215"
+```
+
+If the log shows a combined host such as
+`26.240.153.112,test2=26.157.67.215`, pull the latest scripts and restart the
+server. The host field must be only one IP address.
 
 LAN overrides such as `test1=192.168.0.8` are useful only as a short local
 diagnostic. Do not use them for restoration validation because distant PCs will

@@ -1214,14 +1214,24 @@ if ($RoomJoinHost -eq "127.0.0.1" -or $RoomJoinHost -eq "localhost") {
     $script:RoomJoinHost = $RoomJoinHost
 }
 $script:RoomHostOverrideMap = @{}
-foreach ($entry in @($RoomHostOverrides)) {
-    if ([string]::IsNullOrWhiteSpace($entry)) { continue }
-    $parts = $entry.Split("=", 2, [StringSplitOptions]::None)
-    if ($parts.Count -ne 2 -or [string]::IsNullOrWhiteSpace($parts[0]) -or [string]::IsNullOrWhiteSpace($parts[1])) {
-        Write-ServerEvent "[$(Get-NowStamp)] Ignoring invalid RoomHostOverrides entry: $entry" ([ConsoleColor]::Yellow)
-        continue
+foreach ($entryGroup in @($RoomHostOverrides)) {
+    if ([string]::IsNullOrWhiteSpace($entryGroup)) { continue }
+    foreach ($entry in ($entryGroup -split ",")) {
+        $entry = $entry.Trim()
+        if ([string]::IsNullOrWhiteSpace($entry)) { continue }
+        $parts = $entry.Split("=", 2, [StringSplitOptions]::None)
+        if ($parts.Count -ne 2 -or [string]::IsNullOrWhiteSpace($parts[0]) -or [string]::IsNullOrWhiteSpace($parts[1])) {
+            Write-ServerEvent "[$(Get-NowStamp)] Ignoring invalid RoomHostOverrides entry: $entry" ([ConsoleColor]::Yellow)
+            continue
+        }
+        $accountOverride = $parts[0].Trim()
+        $hostOverride = $parts[1].Trim()
+        if ($hostOverride -match "[=,]") {
+            Write-ServerEvent "[$(Get-NowStamp)] Ignoring invalid RoomHostOverrides host for $accountOverride`: $hostOverride" ([ConsoleColor]::Yellow)
+            continue
+        }
+        $script:RoomHostOverrideMap[$accountOverride] = $hostOverride
     }
-    $script:RoomHostOverrideMap[$parts[0].Trim()] = $parts[1].Trim()
 }
 $script:ChannelUserListReplyMode = $ChannelUserListReplyMode
 $script:EnableUdpRelay = $EnableUdpRelay
